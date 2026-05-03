@@ -1,0 +1,36 @@
+========================================
+SRUU - EMERGENCY RESPONSE SYSTEM LOG
+Session Start: 2026-04-30 01:22:13
+========================================
+
+[2026-04-30 01:23:01] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-2:no valid primary responder
+[2026-04-30 01:23:06] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-1-EMERGENCY-3:no valid primary responder
+[2026-04-30 01:23:16] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-1-EMERGENCY-4:no valid primary responder
+[2026-04-30 01:23:25] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-4:no valid primary responder
+[2026-04-30 01:23:26] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-1-EMERGENCY-5:no valid primary responder
+[2026-04-30 01:23:36] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-1-EMERGENCY-6:no valid primary responder
+[2026-04-30 01:23:37] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-5:no valid primary responder
+[2026-04-30 01:23:49] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-6:no valid primary responder
+[2026-04-30 01:23:56] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-1-EMERGENCY-8:no valid primary responder
+[2026-04-30 01:24:01] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-7:no proposals
+[2026-04-30 01:24:13] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-8:no valid primary responder
+[2026-04-30 01:24:25] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-9:no valid primary responder
+[2026-04-30 01:24:36] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-1-EMERGENCY-12:no proposals
+[2026-04-30 01:24:37] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-10:no valid primary responder
+[2026-04-30 01:24:49] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-2-EMERGENCY-11:no valid primary responder
+[2026-04-30 01:24:56] FAILURE            | From: dispatcher      | To: ( agent-identifier :name logger@100.81.23.58:1099/JADE ) | Ontology: none                 | INCIDENT_FAILED:SENSOR-1-EMERGENCY-14:no valid primary responder
+
+========================================
+SRUU FINAL REPORT
+========================================
+Session Duration: 168 seconds
+Total Incidents:  0
+Units Assigned:   0
+Resolved:         0
+Refused (busy):   0
+Aborted:          0
+Failed:           8
+Unresolved:       0
+Avg Response Time: 0.00 ms
+========================================
+

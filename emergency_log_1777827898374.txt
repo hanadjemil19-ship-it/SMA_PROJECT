@@ -1,0 +1,334 @@
+========================================
+SRUU - EMERGENCY RESPONSE SYSTEM LOG
+Session Start: 2026-05-03 19:04:58
+========================================
+
+[2026-05-03 19:05:23] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-1:STRUCTURAL_COLLAPSE
+[2026-05-03 19:05:30] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-1:STRUCTURAL_COLLAPSE
+[2026-05-03 19:05:30] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-1:firetruck-3:PRIMARY
+[2026-05-03 19:05:32] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-1:firetruck-1:PRIMARY
+[2026-05-03 19:05:32] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-1:police-1:POLICE
+[2026-05-03 19:05:32] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-1-EMERGENCY-1
+[2026-05-03 19:05:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-2:STRUCTURAL_COLLAPSE
+[2026-05-03 19:05:34] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-1:police-2:POLICE
+[2026-05-03 19:05:34] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-1:SENSOR-1-EMERGENCY-1
+[2026-05-03 19:05:35] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-2:firetruck-2:PRIMARY
+[2026-05-03 19:05:36] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-3:SENSOR-1-EMERGENCY-1
+[2026-05-03 19:05:36] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-1:firetruck-3
+[2026-05-03 19:05:37] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-2:SENSOR-2-EMERGENCY-1
+[2026-05-03 19:05:37] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-2-EMERGENCY-1
+[2026-05-03 19:05:37] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-2:police-3:POLICE
+[2026-05-03 19:05:38] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-2:SENSOR-1-EMERGENCY-2
+[2026-05-03 19:05:40] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-2:MEDICAL
+[2026-05-03 19:05:41] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-1:SENSOR-2-EMERGENCY-1
+[2026-05-03 19:05:41] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-1:firetruck-1
+[2026-05-03 19:05:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-2:ambulance-2:PRIMARY
+[2026-05-03 19:05:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-2
+[2026-05-03 19:05:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-2:SENSOR-1-EMERGENCY-2
+[2026-05-03 19:05:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-2:firetruck-2
+[2026-05-03 19:05:43] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-3:BIOHAZARD
+[2026-05-03 19:05:45] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-2:SENSOR-2-EMERGENCY-2
+[2026-05-03 19:05:45] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-3:bcu-1:PRIMARY
+[2026-05-03 19:05:49] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-2:SENSOR-2-EMERGENCY-2
+[2026-05-03 19:05:49] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-2:ambulance-2
+[2026-05-03 19:05:51] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-1:SENSOR-1-EMERGENCY-3
+[2026-05-03 19:05:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-3:BIOHAZARD
+[2026-05-03 19:05:53] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-4:FIRE
+[2026-05-03 19:05:54] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-3:bcu-3:PRIMARY
+[2026-05-03 19:05:55] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-4:firetruck-1:PRIMARY
+[2026-05-03 19:05:57] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-4:police-2:POLICE
+[2026-05-03 19:05:59] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-1-EMERGENCY-4
+[2026-05-03 19:06:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-1:SENSOR-1-EMERGENCY-4
+[2026-05-03 19:06:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-4:firetruck-1
+[2026-05-03 19:06:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-5:FIRE
+[2026-05-03 19:06:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-3:SENSOR-2-EMERGENCY-3
+[2026-05-03 19:06:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-4:FIRE
+[2026-05-03 19:06:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-2:SENSOR-1-EMERGENCY-4
+[2026-05-03 19:06:05] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-5:firetruck-3:PRIMARY
+[2026-05-03 19:06:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-4:firetruck-2:PRIMARY
+[2026-05-03 19:06:07] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-5:police-1:POLICE
+[2026-05-03 19:06:08] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-4:police-3:POLICE
+[2026-05-03 19:06:09] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-1-EMERGENCY-5
+[2026-05-03 19:06:09] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-2-EMERGENCY-4
+[2026-05-03 19:06:11] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-1:SENSOR-1-EMERGENCY-3
+[2026-05-03 19:06:11] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-3:bcu-1
+[2026-05-03 19:06:11] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-2:SENSOR-2-EMERGENCY-4
+[2026-05-03 19:06:13] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-3:SENSOR-1-EMERGENCY-5
+[2026-05-03 19:06:13] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-5:firetruck-3
+[2026-05-03 19:06:13] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-1:SENSOR-1-EMERGENCY-5
+[2026-05-03 19:06:13] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-6:MEDICAL
+[2026-05-03 19:06:15] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-2:SENSOR-2-EMERGENCY-4
+[2026-05-03 19:06:15] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-4:firetruck-2
+[2026-05-03 19:06:15] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-6:ambulance-1:PRIMARY
+[2026-05-03 19:06:16] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-5:MEDICAL
+[2026-05-03 19:06:18] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-5:ambulance-2:PRIMARY
+[2026-05-03 19:06:20] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-1:SENSOR-1-EMERGENCY-6
+[2026-05-03 19:06:21] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-2:SENSOR-2-EMERGENCY-5
+[2026-05-03 19:06:23] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-7:FIRE
+[2026-05-03 19:06:25] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-1:SENSOR-1-EMERGENCY-6
+[2026-05-03 19:06:25] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-6:ambulance-1
+[2026-05-03 19:06:25] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-2:SENSOR-2-EMERGENCY-5
+[2026-05-03 19:06:25] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-5:ambulance-2
+[2026-05-03 19:06:25] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-7:firetruck-1:PRIMARY
+[2026-05-03 19:06:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-7:police-3:POLICE
+[2026-05-03 19:06:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-6:FIRE
+[2026-05-03 19:06:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-3:SENSOR-2-EMERGENCY-3
+[2026-05-03 19:06:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-3:bcu-3
+[2026-05-03 19:06:29] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-1-EMERGENCY-7
+[2026-05-03 19:06:30] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-6:firetruck-3:PRIMARY
+[2026-05-03 19:06:31] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-7
+[2026-05-03 19:06:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-1:SENSOR-1-EMERGENCY-7
+[2026-05-03 19:06:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-7:firetruck-1
+[2026-05-03 19:06:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-8:STRUCTURAL_COLLAPSE
+[2026-05-03 19:06:36] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-8:firetruck-2:PRIMARY
+[2026-05-03 19:06:37] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-2-EMERGENCY-6
+[2026-05-03 19:06:38] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-8:police-3:POLICE
+[2026-05-03 19:06:38] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-2:SENSOR-1-EMERGENCY-8
+[2026-05-03 19:06:40] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-7:CRYOGENIC_LEAK
+[2026-05-03 19:06:40] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-8
+[2026-05-03 19:06:41] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-3:SENSOR-2-EMERGENCY-6
+[2026-05-03 19:06:41] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-6:firetruck-3
+[2026-05-03 19:06:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-7:bcu-1:PRIMARY
+[2026-05-03 19:06:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-2:SENSOR-1-EMERGENCY-8
+[2026-05-03 19:06:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-8:firetruck-2
+[2026-05-03 19:06:43] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-9:MEDICAL
+[2026-05-03 19:06:46] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-9:ambulance-1:PRIMARY
+[2026-05-03 19:06:47] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-1:SENSOR-2-EMERGENCY-7
+[2026-05-03 19:06:48] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-1:SENSOR-1-EMERGENCY-9
+[2026-05-03 19:06:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-8:MEDICAL
+[2026-05-03 19:06:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-1:SENSOR-1-EMERGENCY-9
+[2026-05-03 19:06:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-9:ambulance-1
+[2026-05-03 19:06:53] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-10:STRUCTURAL_COLLAPSE
+[2026-05-03 19:06:54] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-8:ambulance-2:PRIMARY
+[2026-05-03 19:06:55] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-10:firetruck-1:PRIMARY
+[2026-05-03 19:06:57] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-2:SENSOR-2-EMERGENCY-8
+[2026-05-03 19:06:58] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-10:police-3:POLICE
+[2026-05-03 19:06:58] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-1-EMERGENCY-10
+[2026-05-03 19:07:00] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-10
+[2026-05-03 19:07:01] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-2:SENSOR-2-EMERGENCY-8
+[2026-05-03 19:07:01] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-8:ambulance-2
+[2026-05-03 19:07:02] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-1:SENSOR-1-EMERGENCY-10
+[2026-05-03 19:07:02] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-10:firetruck-1
+[2026-05-03 19:07:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-11:FIRE
+[2026-05-03 19:07:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-9:CRYOGENIC_LEAK
+[2026-05-03 19:07:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-11:firetruck-3:PRIMARY
+[2026-05-03 19:07:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-9:bcu-3:PRIMARY
+[2026-05-03 19:07:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-1:SENSOR-2-EMERGENCY-7
+[2026-05-03 19:07:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-7:bcu-1
+[2026-05-03 19:07:08] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-11:police-3:POLICE
+[2026-05-03 19:07:12] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-3:SENSOR-2-EMERGENCY-9
+[2026-05-03 19:07:13] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-1-EMERGENCY-11
+[2026-05-03 19:07:13] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-12:CRYOGENIC_LEAK
+[2026-05-03 19:07:15] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-11
+[2026-05-03 19:07:16] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-12:bcu-1:PRIMARY
+[2026-05-03 19:07:16] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-10:CRYOGENIC_LEAK
+[2026-05-03 19:07:17] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-3:SENSOR-1-EMERGENCY-11
+[2026-05-03 19:07:17] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-11:firetruck-3
+[2026-05-03 19:07:18] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-10:bcu-2:PRIMARY
+[2026-05-03 19:07:21] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-1:SENSOR-1-EMERGENCY-12
+[2026-05-03 19:07:24] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-13:STRUCTURAL_COLLAPSE
+[2026-05-03 19:07:25] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-2:SENSOR-2-EMERGENCY-10
+[2026-05-03 19:07:26] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-13:firetruck-1:PRIMARY
+[2026-05-03 19:07:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-13:police-3:POLICE
+[2026-05-03 19:07:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-11:MEDICAL
+[2026-05-03 19:07:30] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-11:ambulance-2:PRIMARY
+[2026-05-03 19:07:30] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-2:SENSOR-2-EMERGENCY-11
+[2026-05-03 19:07:31] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-1-EMERGENCY-13
+[2026-05-03 19:07:31] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ABORTED:SENSOR-1-EMERGENCY-13:firetruck-1:LOW_WATER
+[2026-05-03 19:07:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-3:SENSOR-2-EMERGENCY-9
+[2026-05-03 19:07:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-9:bcu-3
+[2026-05-03 19:07:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-13:firetruck-3:PRIMARY
+[2026-05-03 19:07:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-13
+[2026-05-03 19:07:34] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-14:MEDICAL
+[2026-05-03 19:07:35] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-2:SENSOR-2-EMERGENCY-11
+[2026-05-03 19:07:35] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-11:ambulance-2
+[2026-05-03 19:07:36] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-14:ambulance-1:PRIMARY
+[2026-05-03 19:07:38] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-1-EMERGENCY-13
+[2026-05-03 19:07:38] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ABORTED:SENSOR-1-EMERGENCY-13:firetruck-3:LOW_WATER
+[2026-05-03 19:07:39] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-1:SENSOR-1-EMERGENCY-14
+[2026-05-03 19:07:40] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-12:STRUCTURAL_COLLAPSE
+[2026-05-03 19:07:40] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-13:firetruck-2:PRIMARY
+[2026-05-03 19:07:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-1:SENSOR-1-EMERGENCY-12
+[2026-05-03 19:07:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-12:bcu-1
+[2026-05-03 19:07:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-1:SENSOR-1-EMERGENCY-14
+[2026-05-03 19:07:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-14:ambulance-1
+[2026-05-03 19:07:44] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-15:STRUCTURAL_COLLAPSE
+[2026-05-03 19:07:46] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-2:SENSOR-1-EMERGENCY-13
+[2026-05-03 19:07:47] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-2:SENSOR-2-EMERGENCY-10
+[2026-05-03 19:07:47] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-10:bcu-2
+[2026-05-03 19:07:49] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-12:firetruck-1:PRIMARY
+[2026-05-03 19:07:50] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-2:SENSOR-1-EMERGENCY-13
+[2026-05-03 19:07:50] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-13:firetruck-2
+[2026-05-03 19:07:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-13:BIOHAZARD
+[2026-05-03 19:07:54] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-16:MEDICAL
+[2026-05-03 19:07:54] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-13:bcu-1:PRIMARY
+[2026-05-03 19:07:55] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-2-EMERGENCY-12
+[2026-05-03 19:07:56] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-16:ambulance-1:PRIMARY
+[2026-05-03 19:07:57] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-1:SENSOR-1-EMERGENCY-16
+[2026-05-03 19:07:59] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-1:SENSOR-2-EMERGENCY-12
+[2026-05-03 19:07:59] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-12:firetruck-1
+[2026-05-03 19:08:00] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-15:firetruck-3:PRIMARY
+[2026-05-03 19:08:00] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-1:SENSOR-2-EMERGENCY-13
+[2026-05-03 19:08:02] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-15:police-3:POLICE
+[2026-05-03 19:08:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-1:SENSOR-1-EMERGENCY-16
+[2026-05-03 19:08:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-16:ambulance-1
+[2026-05-03 19:08:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-17:MEDICAL
+[2026-05-03 19:08:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-14:CRYOGENIC_LEAK
+[2026-05-03 19:08:05] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-1-EMERGENCY-15
+[2026-05-03 19:08:05] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-15
+[2026-05-03 19:08:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-17:ambulance-1:PRIMARY
+[2026-05-03 19:08:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-14:bcu-3:PRIMARY
+[2026-05-03 19:08:08] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-1:SENSOR-1-EMERGENCY-17
+[2026-05-03 19:08:09] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-3:SENSOR-1-EMERGENCY-15
+[2026-05-03 19:08:09] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-15:firetruck-3
+[2026-05-03 19:08:10] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-1:SENSOR-1-EMERGENCY-17
+[2026-05-03 19:08:10] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-17:ambulance-1
+[2026-05-03 19:08:12] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-3:SENSOR-2-EMERGENCY-14
+[2026-05-03 19:08:14] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-18:MEDICAL
+[2026-05-03 19:08:16] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-18:ambulance-1:PRIMARY
+[2026-05-03 19:08:16] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-15:BIOHAZARD
+[2026-05-03 19:08:17] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-1:SENSOR-1-EMERGENCY-18
+[2026-05-03 19:08:18] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-15:bcu-2:PRIMARY
+[2026-05-03 19:08:21] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-1:SENSOR-2-EMERGENCY-13
+[2026-05-03 19:08:21] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-13:bcu-1
+[2026-05-03 19:08:21] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-1:SENSOR-1-EMERGENCY-18
+[2026-05-03 19:08:21] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-18:ambulance-1
+[2026-05-03 19:08:24] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-19:CRYOGENIC_LEAK
+[2026-05-03 19:08:24] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-2:SENSOR-2-EMERGENCY-15
+[2026-05-03 19:08:26] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-19:bcu-1:PRIMARY
+[2026-05-03 19:08:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-16:CRYOGENIC_LEAK
+[2026-05-03 19:08:31] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-1:SENSOR-1-EMERGENCY-19
+[2026-05-03 19:08:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-3:SENSOR-2-EMERGENCY-14
+[2026-05-03 19:08:33] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-14:bcu-3
+[2026-05-03 19:08:34] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-20:FIRE
+[2026-05-03 19:08:36] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-20:firetruck-1:PRIMARY
+[2026-05-03 19:08:37] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-16:bcu-3:PRIMARY
+[2026-05-03 19:08:38] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-20:police-3:POLICE
+[2026-05-03 19:08:39] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-20
+[2026-05-03 19:08:39] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-1-EMERGENCY-20
+[2026-05-03 19:08:40] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-17:CRYOGENIC_LEAK
+[2026-05-03 19:08:43] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-1:SENSOR-1-EMERGENCY-20
+[2026-05-03 19:08:43] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-20:firetruck-1
+[2026-05-03 19:08:44] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-21:FIRE
+[2026-05-03 19:08:44] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-3:SENSOR-2-EMERGENCY-16
+[2026-05-03 19:08:45] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-2:SENSOR-2-EMERGENCY-15
+[2026-05-03 19:08:45] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-15:bcu-2
+[2026-05-03 19:08:46] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-21:firetruck-3:PRIMARY
+[2026-05-03 19:08:48] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-21:police-3:POLICE
+[2026-05-03 19:08:49] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-17:bcu-2:PRIMARY
+[2026-05-03 19:08:50] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-1-EMERGENCY-21
+[2026-05-03 19:08:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-21
+[2026-05-03 19:08:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-18:CRYOGENIC_LEAK
+[2026-05-03 19:08:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-1:SENSOR-1-EMERGENCY-19
+[2026-05-03 19:08:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-19:bcu-1
+[2026-05-03 19:08:54] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-22:STRUCTURAL_COLLAPSE
+[2026-05-03 19:08:54] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-3:SENSOR-1-EMERGENCY-21
+[2026-05-03 19:08:54] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-21:firetruck-3
+[2026-05-03 19:08:56] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-22:firetruck-1:PRIMARY
+[2026-05-03 19:08:57] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-2:SENSOR-2-EMERGENCY-17
+[2026-05-03 19:08:58] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-22:police-3:POLICE
+[2026-05-03 19:08:59] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-1-EMERGENCY-22
+[2026-05-03 19:09:01] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-18:bcu-1:PRIMARY
+[2026-05-03 19:09:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-1:SENSOR-1-EMERGENCY-22
+[2026-05-03 19:09:03] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-22:firetruck-1
+[2026-05-03 19:09:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-23:STRUCTURAL_COLLAPSE
+[2026-05-03 19:09:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-19:BIOHAZARD
+[2026-05-03 19:09:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | PERIMETER_SECURED:police-3:SENSOR-1-EMERGENCY-22
+[2026-05-03 19:09:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-23:firetruck-3:PRIMARY
+[2026-05-03 19:09:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-3:SENSOR-2-EMERGENCY-16
+[2026-05-03 19:09:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-16:bcu-3
+[2026-05-03 19:09:07] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-1-EMERGENCY-23
+[2026-05-03 19:09:09] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-1:SENSOR-2-EMERGENCY-18
+[2026-05-03 19:09:11] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-3:SENSOR-1-EMERGENCY-23
+[2026-05-03 19:09:11] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-23:firetruck-3
+[2026-05-03 19:09:13] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-19:bcu-3:PRIMARY
+[2026-05-03 19:09:14] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-24:CRYOGENIC_LEAK
+[2026-05-03 19:09:16] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-20:MEDICAL
+[2026-05-03 19:09:18] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-20:ambulance-2:PRIMARY
+[2026-05-03 19:09:19] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-2:SENSOR-2-EMERGENCY-17
+[2026-05-03 19:09:19] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-17:bcu-2
+[2026-05-03 19:09:21] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-2:SENSOR-2-EMERGENCY-20
+[2026-05-03 19:09:21] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-3:SENSOR-2-EMERGENCY-19
+[2026-05-03 19:09:23] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-24:bcu-2:PRIMARY
+[2026-05-03 19:09:24] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-25:FIRE
+[2026-05-03 19:09:24] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-2:SENSOR-2-EMERGENCY-20
+[2026-05-03 19:09:24] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-20:ambulance-2
+[2026-05-03 19:09:26] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-25:firetruck-1:PRIMARY
+[2026-05-03 19:09:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-21:BIOHAZARD
+[2026-05-03 19:09:31] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-2:SENSOR-1-EMERGENCY-24
+[2026-05-03 19:09:32] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-1:SENSOR-1-EMERGENCY-25
+[2026-05-03 19:09:32] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-1:SENSOR-2-EMERGENCY-18
+[2026-05-03 19:09:32] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-18:bcu-1
+[2026-05-03 19:09:34] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-26:STRUCTURAL_COLLAPSE
+[2026-05-03 19:09:36] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-1:SENSOR-1-EMERGENCY-25
+[2026-05-03 19:09:36] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-25:firetruck-1
+[2026-05-03 19:09:36] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-26:firetruck-3:PRIMARY
+[2026-05-03 19:09:37] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-21:bcu-1:PRIMARY
+[2026-05-03 19:09:40] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-22:BIOHAZARD
+[2026-05-03 19:09:41] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:firetruck-3:SENSOR-1-EMERGENCY-26
+[2026-05-03 19:09:42] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-1:SENSOR-2-EMERGENCY-21
+[2026-05-03 19:09:44] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-27:MEDICAL
+[2026-05-03 19:09:45] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-3:SENSOR-2-EMERGENCY-19
+[2026-05-03 19:09:45] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-19:bcu-3
+[2026-05-03 19:09:45] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:firetruck-3:SENSOR-1-EMERGENCY-26
+[2026-05-03 19:09:45] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-26:firetruck-3
+[2026-05-03 19:09:46] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-27:ambulance-1:PRIMARY
+[2026-05-03 19:09:46] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-1:SENSOR-1-EMERGENCY-27
+[2026-05-03 19:09:49] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-22:bcu-3:PRIMARY
+[2026-05-03 19:09:50] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-1:SENSOR-1-EMERGENCY-27
+[2026-05-03 19:09:50] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-27:ambulance-1
+[2026-05-03 19:09:52] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-23:CRYOGENIC_LEAK
+[2026-05-03 19:09:54] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-28:BIOHAZARD
+[2026-05-03 19:09:55] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-2:SENSOR-1-EMERGENCY-24
+[2026-05-03 19:09:55] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-1-EMERGENCY-24:bcu-2
+[2026-05-03 19:09:56] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-3:SENSOR-2-EMERGENCY-22
+[2026-05-03 19:10:01] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-23:bcu-2:PRIMARY
+[2026-05-03 19:10:02] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-1:SENSOR-2-EMERGENCY-21
+[2026-05-03 19:10:02] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-21:bcu-1
+[2026-05-03 19:10:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-29:CRYOGENIC_LEAK
+[2026-05-03 19:10:04] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-24:MEDICAL
+[2026-05-03 19:10:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-29:bcu-1:PRIMARY
+[2026-05-03 19:10:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-2-EMERGENCY-24:ambulance-2:PRIMARY
+[2026-05-03 19:10:06] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-2:SENSOR-2-EMERGENCY-24
+[2026-05-03 19:10:08] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-2:SENSOR-2-EMERGENCY-23
+[2026-05-03 19:10:10] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:ambulance-2:SENSOR-2-EMERGENCY-24
+[2026-05-03 19:10:10] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-24:ambulance-2
+[2026-05-03 19:10:13] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:bcu-1:SENSOR-1-EMERGENCY-29
+[2026-05-03 19:10:14] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-30:BIOHAZARD
+[2026-05-03 19:10:16] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-25:CRYOGENIC_LEAK
+[2026-05-03 19:10:18] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_COMPLETE:bcu-3:SENSOR-2-EMERGENCY-22
+[2026-05-03 19:10:18] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | RESOLVED:SENSOR-2-EMERGENCY-22:bcu-3
+[2026-05-03 19:10:23] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-30:bcu-3:PRIMARY
+[2026-05-03 19:10:24] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-1-EMERGENCY-31:MEDICAL
+[2026-05-03 19:10:26] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | ASSIGNED:SENSOR-1-EMERGENCY-31:ambulance-1:PRIMARY
+[2026-05-03 19:10:26] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | MISSION_ARRIVED:ambulance-1:SENSOR-1-EMERGENCY-31
+[2026-05-03 19:10:28] INFORM             | From: dispatcher      | To: ( agent-identifier :name logger@169.254.83.107:1099/JADE ) | Ontology: none                 | DETECTED:SENSOR-2-EMERGENCY-26:FIRE
+
+========================================
+SRUU FINAL REPORT
+========================================
+Session Duration: 331 seconds
+Total Incidents:  57
+Units Assigned:   54
+Resolved:         50
+Refused (busy):   0
+Aborted:          1
+Failed:           0
+Unresolved:       3
+Avg Response Time: 8191.94 ms
+Table 3 - Response metrics by incident type
+Type                 |  Count |  Min(ms) |  Avg(ms) |  Max(ms)
+---------------------+--------+----------+----------+----------
+BIOHAZARD            |      7 |     7090 |    11797 |    17599
+CRYOGENIC_LEAK       |     12 |     6825 |    11719 |    17647
+FIRE                 |      9 |     5099 |     6874 |     9470
+MEDICAL              |     14 |     2457 |     4222 |     6624
+STRUCTURAL_COLLAPSE  |     11 |     3006 |     8181 |    21056
+Response Time by Incident Type (min/avg/max)
+BIOHAZARD               7090/  11797/  17599 ms | ########################
+CRYOGENIC_LEAK          6825/  11719/  17647 ms | ########################
+FIRE                    5099/   6874/   9470 ms | ##############
+MEDICAL                 2457/   4222/   6624 ms | #########
+STRUCTURAL_COLLAPSE     3006/   8181/  21056 ms | #################
+========================================
+
