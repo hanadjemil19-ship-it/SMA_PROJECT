@@ -1,3 +1,4 @@
+emergency_log_*.txt
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/
