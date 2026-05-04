@@ -68,7 +68,7 @@ public class EmergencyOntology extends Ontology {
             PredicateSchema hospitalAssignSchema = new PredicateSchema("HospitalAssignment");
             hospitalAssignSchema.add("hospital", (ConceptSchema) getSchema("Hospital"));
             hospitalAssignSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
-            hospitalAssignSchema.add("hospitalAid", (ConceptSchema) getSchema(jade.domain.FIPAAgentManagement.FIPAManagementOntology.AID), ObjectSchema.OPTIONAL);
+            hospitalAssignSchema.add("hospitalAid", (ConceptSchema) getSchema(BasicOntology.AID), ObjectSchema.OPTIONAL);
             add(hospitalAssignSchema, HospitalAssignment.class);
             // HospitalRequest predicate
             PredicateSchema hospitalRequestSchema = new PredicateSchema("HospitalRequest");

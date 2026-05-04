@@ -33,6 +33,7 @@ public class PoliceAgent extends Agent {
     private Map<String, Emergency> pendingEmergencies = new HashMap<>();
     private Emergency assignedEmergency = null;
     private String currentMissionId = null;
+    private boolean idleNotified = false;
 
     private TickerBehaviour patrolBehaviour;
 
@@ -101,7 +102,8 @@ public class PoliceAgent extends Agent {
                 MessageTemplate mt = new MessageTemplate(msg ->
                         msg.getPerformative() == ACLMessage.INFORM
                                 && msg.getContent() != null
-                                && msg.getContent().startsWith("PERIMETER_RELEASED:"));
+                                && (msg.getContent().startsWith("PERIMETER_RELEASED:")
+                                || msg.getContent().startsWith("RELEASE_PERIMETER:")));
                 ACLMessage msg = receive(mt);
                 if (msg != null) handlePerimeterReleased(msg);
                 else block();
@@ -223,15 +225,31 @@ public class PoliceAgent extends Agent {
     private void handlePerimeterReleased(ACLMessage msg) {
         String content = msg.getContent();
         String[] parts = content != null ? content.split(":") : new String[0];
-        if (parts.length < 2 || currentMissionId == null || !currentMissionId.equals(parts[1])) {
+        if (parts.length < 2) {
             return;
         }
-        System.out.println("[" + getLocalName() + "] Perimeter released for " + currentMissionId + ", resuming patrol");
+        String incidentId = parts[1];
+        // Invariant: police must release perimeter even if EN_ROUTE (or before ON_SITE).
+        boolean matchesAssigned = assignedEmergency != null && incidentId.equals(assignedEmergency.getId());
+        boolean matchesCurrent = currentMissionId != null && incidentId.equals(currentMissionId);
+        boolean matchesPending = pendingEmergencies.containsKey(incidentId);
+        if (!matchesAssigned && !matchesCurrent && !matchesPending) {
+            return;
+        }
+
+        System.out.println("[" + getLocalName() + "] Perimeter release received for " + incidentId
+                + " (state=" + state + "), cancelling and resuming patrol");
         transitionTo(State.IDLE);
         workload = 0;
         assignedEmergency = null;
         currentMissionId = null;
         notifyDispatcherIdle();
+        if (movement != null) {
+            Location patrolPoint = new Location(random.nextInt(50), random.nextInt(50));
+            movement.setTarget(patrolPoint, () -> {
+                System.out.println("[" + getLocalName() + "] Patrolling at " + patrolPoint);
+            });
+        }
     }
 
     private void handleReject(ACLMessage reject) {
@@ -250,15 +268,26 @@ public class PoliceAgent extends Agent {
         if (state != newState) {
             pendingEmergencies.clear();
             state = newState;
+            if (newState != State.IDLE) {
+                idleNotified = false;
+            }
         }
     }
 
     private void notifyDispatcherIdle() {
-        ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
+        if (idleNotified) {
+            return;
+        }
         AID dispatcher = findAgentByService("COORDINATION");
-        if (dispatcher != null) idle.addReceiver(dispatcher);
+        if (dispatcher == null) {
+            dispatcher = new AID("dispatcher", AID.ISLOCALNAME);
+        }
+
+        ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
+        idle.addReceiver(dispatcher);
         idle.setContent("UNIT_IDLE:" + getLocalName());
         send(idle);
+        idleNotified = true;
         System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
     }
 
@@ -283,5 +312,29 @@ public class PoliceAgent extends Agent {
             e.printStackTrace();
         }
         System.out.println("[" + getLocalName() + "] PoliceAgent terminated");
+    }
+
+    // Visible for tests (package-private)
+    void testSetMissionForRelease(String incidentId, State s) {
+        this.state = s;
+        this.workload = 1;
+        this.currentMissionId = incidentId;
+    }
+
+    // Visible for tests (package-private)
+    void testHandleReleaseMessage(String incidentId) {
+        ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+        msg.setContent("RELEASE_PERIMETER:" + incidentId);
+        handlePerimeterReleased(msg);
+    }
+
+    // Visible for tests (package-private)
+    String testState() {
+        return state.name();
+    }
+
+    // Visible for tests (package-private)
+    String testCurrentMissionId() {
+        return currentMissionId;
     }
 }

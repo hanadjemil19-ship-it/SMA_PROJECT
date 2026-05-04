@@ -285,14 +285,8 @@ public class AmbulanceAgent extends Agent {
         handoff.setConversationId(currentMissionId + ":HANDOFF");
         handoff.setOntology(EmergencyOntology.getInstance().getName());
         handoff.setLanguage(new SLCodec().getName());
-        PatientHandoff ph = new PatientHandoff();
-        ph.setEmergencyId(currentMissionId);
-        ph.setAmbulanceId(getLocalName());
-        try {
-            getContentManager().fillContent(handoff, ph);
-        } catch (Exception e) {
-            e.printStackTrace();
-        }
+        // Bypass JADE serialization bug by sending it as a simple string message
+        handoff.setContent("PATIENT_HANDOFF:" + currentMissionId + ":" + getLocalName());
         send(handoff);
 
         addBehaviour(new CyclicBehaviour(this) {
@@ -314,7 +308,17 @@ public class AmbulanceAgent extends Agent {
                     System.out.println("[" + getLocalName() + "] Hospital handoff not accepted for "
                             + currentMissionId + ": " + msg.getContent());
                 }
-                returnToBase();
+                sendLifecycleInform("MISSION_COMPLETE", currentMissionId);
+                transitionTo(State.IDLE);
+                workload = 0;
+                assignedEmergency = null;
+                assignedHospital = null;
+                assignedHospitalAid = null;
+                currentMissionId = null;
+                notifyDispatcherIdle();
+
+                Location basePos = baseLocation();
+                movement.setTarget(basePos, () -> System.out.println("[" + getLocalName() + "] Back at base, READY for next call"));
                 removeBehaviour(this);
             }
         });

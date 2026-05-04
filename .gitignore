@@ -3,7 +3,7 @@ emergency_log*.txt
 
 # Ignore IntelliJ IDEA folder
 .idea/
-
+*.csv
 # Ignore Maven build folder (good practice)
 target/
 target/

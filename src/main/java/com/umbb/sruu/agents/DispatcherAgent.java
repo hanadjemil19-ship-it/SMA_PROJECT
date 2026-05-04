@@ -14,35 +14,50 @@ import jade.lang.acl.ACLMessage;
 import jade.lang.acl.MessageTemplate;
 
 import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.stream.Collectors;
 
 public class DispatcherAgent extends Agent {
 
     // Contract-Net proposal collection window (PROPOSE / REFUSE)
-    private static final long PROPOSAL_TIMEOUT = 2000;
+    private static final long PROPOSAL_TIMEOUT = 6000;
+    private static final long MIN_PROPOSAL_WAIT = 500;
     private static final long RETRY_DELAY = 5000;
     private static final long QUEUE_RETRY_PERIOD = 10000;
 
-    private Map<String, Emergency> emergencyData = new HashMap<>();
-    private Map<String, String> emergencyServiceType = new HashMap<>();
+    private final ConcurrentHashMap<String, Emergency> emergencyData = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> emergencyServiceType = new ConcurrentHashMap<>();
 
-    private Map<String, ProposalCollector> activeCollectors = new HashMap<>();
-    private Map<String, Integer> retryCounts = new HashMap<>();
-    private static final int MAX_RETRIES = 2;
-    private Map<String, String> assignedUnits = new HashMap<>();
-    private Set<String> failedIncidents = new HashSet<>();
-    private Set<String> resolvedIncidents = new HashSet<>();
-    private Queue<String> queuedIncidents = new LinkedList<>();
-    private Set<String> queuedIncidentIds = new HashSet<>();
-    private Map<String, Integer> queueRounds = new HashMap<>();
-    private Map<String, Long> queueSince = new HashMap<>();
-    private Map<String, String> policeAssignments = new HashMap<>();
-    private Set<String> clearedByPolice = new HashSet<>();
-    private Map<String, String> policeConversationParents = new HashMap<>();
-    private final Map<String, ContractNetSession> contractNetSessions = new HashMap<>();
+    private final ConcurrentHashMap<String, ProposalCollector> activeCollectors = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Integer> retryCounts = new ConcurrentHashMap<>();
+    private static final int MAX_RETRIES = 3;
+    private static final int MAX_QUEUE_ROUNDS = 5;
+    private final ConcurrentHashMap<String, String> assignedUnits = new ConcurrentHashMap<>();
+    private final Set<String> failedIncidents = ConcurrentHashMap.newKeySet();
+    private final Set<String> resolvedIncidents = ConcurrentHashMap.newKeySet();
+    private final Queue<String> queuedIncidents = new ConcurrentLinkedQueue<>();
+    private final Set<String> queuedIncidentIds = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, Integer> queueRounds = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Long> queueSince = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> policeAssignments = new ConcurrentHashMap<>();
+    private final Set<String> clearedByPolice = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, String> policeConversationParents = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, String> policeConversationByIncident = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ContractNetSession> contractNetSessions = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, IncidentStatus> incidentStatus = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, ConcurrentLinkedQueue<IncidentEvent>> incidentEvents = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, RetryContext> retryContextByIncident = new ConcurrentHashMap<>();
 
-    // FIX: Track which units are currently assigned to prevent double-assignment
-    private Set<String> busyUnits = new HashSet<>();
+    // Track unit reservations: pending (during CNP) and busy (assigned/in-mission).
+    private final Set<String> busyUnits = ConcurrentHashMap.newKeySet();
+    private final Set<String> pendingUnits = ConcurrentHashMap.newKeySet();
+    private final ConcurrentHashMap<String, String> pendingUnitOwners = new ConcurrentHashMap<>();
+    private final ConcurrentHashMap<String, Set<String>> pendingByConversation = new ConcurrentHashMap<>();
+    private static final int MESSAGE_CACHE_LIMIT = 100;
+    private final Set<String> recentMessageIds = ConcurrentHashMap.newKeySet();
+    private final ConcurrentLinkedDeque<String> recentMessageOrder = new ConcurrentLinkedDeque<>();
     private final Object assignmentLock = new Object();
 
     @Override
@@ -115,6 +130,8 @@ public class DispatcherAgent extends Agent {
                             && (content.startsWith("UNIT_ABORT:")
                             || content.startsWith("ABORT:")
                             || content.startsWith("UNIT_IDLE:")
+                            || content.equals("IDLE")
+                            || content.startsWith("IDLE:")
                             || content.startsWith("MISSION_ARRIVED:")
                             || content.startsWith("MISSION_COMPLETE:")
                             || content.startsWith("PERIMETER_SECURED:")
@@ -172,6 +189,8 @@ public class DispatcherAgent extends Agent {
             System.out.println("[" + getLocalName() + "] From: " + msg.getSender().getLocalName());
 
             String eId = emergency.getId();
+            appendIncidentEvent(eId, new IncidentEvent.Detected(System.currentTimeMillis(), emergency.getType()));
+            incidentStatus.putIfAbsent(eId, IncidentStatus.PENDING);
             notifyLogger("DETECTED:" + eId + ":" + emergency.getType());
             if (failedIncidents.contains(eId)) {
                 System.out.println("[" + getLocalName() + "] Ignoring emergency " + eId + " because it is already marked FAILED");
@@ -192,11 +211,8 @@ public class DispatcherAgent extends Agent {
 
             requestTrafficClearance(emergency);
             searchAndSendCFP(serviceType, emergency, eId);
-
-            if (emergency.getType().equals("FIRE") || emergency.getType().equals("STRUCTURAL_COLLAPSE")) {
-                System.out.println("[" + getLocalName() + "] Starting police perimeter Contract Net concurrently with primary assignment");
-                startPoliceContractNet(eId, emergency);
-            }
+            // Invariant: perimeter assignment must be conditional on successful primary assignment.
+            // Police CNP is started only after a primary unit is assigned (see evaluateAndAssign()).
 
         } catch (Exception e) {
             System.err.println("[" + getLocalName() + "] Error: " + e.getMessage());
@@ -216,9 +232,8 @@ public class DispatcherAgent extends Agent {
             case "STRUCTURAL_COLLAPSE":
                 return "RESCUE";
             case "BIOHAZARD":
-                return "BIOHAZARD";
             case "CRYOGENIC_LEAK":
-                return "CRYOGENIC_LEAK";
+                return "HAZMAT"; // CHANGED THIS TO MATCH THE DF!
             case "MEDICAL":
                 return "MEDICAL";
             default:
@@ -256,6 +271,7 @@ public class DispatcherAgent extends Agent {
 
             if (results.length == 0) {
                 System.out.println("[" + getLocalName() + "] NO UNITS AVAILABLE for " + serviceType);
+                startContractNetSession(conversationId, 0);
                 return;
             }
 
@@ -266,8 +282,8 @@ public class DispatcherAgent extends Agent {
                 AID unitAID = result.getName();
                 String local = unitAID.getLocalName();
                 synchronized (assignmentLock) {
-                    if (busyUnits.contains(local)) {
-                        System.out.println("[" + getLocalName() + "] Skipping CFP to busy unit " + local);
+                    if (busyUnits.contains(local) || pendingUnits.contains(local)) {
+                        System.out.println("[" + getLocalName() + "] Skipping CFP to unavailable unit " + local);
                         continue;
                     }
                 }
@@ -379,7 +395,7 @@ public class DispatcherAgent extends Agent {
                 + (refuse.getContent() != null ? (" (" + refuse.getContent() + ")") : ""));
 
         if (allRepliesIn) {
-            finalizeContractNet(conversationId);
+            scheduleFinalizeRespectingMinWait(conversationId);
         }
     }
 
@@ -395,7 +411,7 @@ public class DispatcherAgent extends Agent {
                     }
                 }
                 if (allRepliesIn) {
-                    finalizeContractNet(conversationId);
+                    scheduleFinalizeRespectingMinWait(conversationId);
                 }
             }
 
@@ -415,10 +431,30 @@ public class DispatcherAgent extends Agent {
             }
 
             ProposalCollector collector = activeCollectors.get(eId);
+            boolean evaluateLateImmediately = false;
             if (collector == null) {
+                if (!activeCollectors.containsKey(baseEId)
+                        && emergencyData.containsKey(baseEId)
+                        && !assignedUnits.containsKey(baseEId)
+                        && !failedIncidents.contains(baseEId)) {
+                    System.out.println("[" + getLocalName() + "] Late proposal from " + status.getUnitId()
+                            + " accepted for unassigned incident " + baseEId + " (mini-collector)");
+                    Emergency lateEmergency = emergencyData.get(baseEId);
+                    String lateServiceType = emergencyServiceType.get(baseEId);
+                    if (lateServiceType == null || lateServiceType.trim().isEmpty()) {
+                        lateServiceType = determineServiceType(lateEmergency);
+                        emergencyServiceType.put(baseEId, lateServiceType);
+                    }
+                    ProposalCollector miniCollector = new ProposalCollector(baseEId, lateServiceType, lateEmergency);
+                    activeCollectors.put(baseEId, miniCollector);
+                    collector = miniCollector;
+                    eId = baseEId;
+                    evaluateLateImmediately = true;
+                } else {
                 System.out.println("[" + getLocalName() + "] Late proposal from " + status.getUnitId()
                         + " - emergency already assigned or timed out");
                 return;
+                }
             }
 
             Emergency emergency = emergencyData.get(baseEId);
@@ -429,11 +465,19 @@ public class DispatcherAgent extends Agent {
                 return;
             }
             String serviceType = isPoliceRole(eId) ? "CROWD_CONTROL" : emergencyServiceType.get(baseEId);
+            String proposerName = sender.getLocalName();
+            if (!tryReservePendingUnit(proposerName, eId)) {
+                System.out.println("[" + getLocalName() + "] Ignoring proposal from " + proposerName
+                        + " for " + eId + " because unit is already pending/busy in another incident");
+                rejectProposal(propose, "Unit already reserved by another incident");
+                return;
+            }
 
             double utility = UtilityCalculator.calculateUtility(status, emergency, serviceType);
             boolean validPrimaryResponder = UtilityCalculator.isValidPrimaryResponder(status, emergency);
-            if (isPoliceRole(eId) && status.getUnitId() != null && status.getUnitId().contains("police")) {
-                validPrimaryResponder = true;
+            if (isPoliceRole(eId) && status.getUnitId() != null) {
+                String normalized = status.getUnitId().toLowerCase(Locale.ROOT);
+                validPrimaryResponder = normalized.contains("police") || normalized.contains("firetruck");
             }
 
             System.out.println("[" + getLocalName() + "] Utility score for " + status.getUnitId()
@@ -441,6 +485,9 @@ public class DispatcherAgent extends Agent {
                     + " (validPrimary=" + validPrimaryResponder + ")");
 
             collector.addProposal(sender, propose, utility, validPrimaryResponder);
+            if (evaluateLateImmediately) {
+                evaluateAndAssign(eId);
+            }
 
         } catch (Exception e) {
             System.err.println("[" + getLocalName() + "] Error handling PROPOSE: " + e.getMessage());
@@ -456,6 +503,7 @@ public class DispatcherAgent extends Agent {
 
         ProposalCollector collector = activeCollectors.remove(eId);
         if (collector == null || collector.isEmpty()) {
+            releaseAllPendingForConversation(eId);
             Emergency emergency = emergencyData.get(baseIncidentId(eId));
             if (emergency != null) {
                 scheduleRetry(eId, emergency, "no proposals");
@@ -471,6 +519,7 @@ public class DispatcherAgent extends Agent {
         Emergency emergency = emergencyData.get(baseIncidentId(eId));
         List<Map.Entry<AID, ProposalData>> rankedCandidates = collector.getRankedValidPrimaryResponders();
         if (rankedCandidates.isEmpty()) {
+            releaseAllPendingForConversation(eId);
             System.out.println("[" + getLocalName() + "] No valid primary responder proposal for " + eId);
             rejectAll(collector, "No valid primary responder for " + (emergency != null ? emergency.getType() : eId));
             if (emergency != null) {
@@ -481,7 +530,7 @@ public class DispatcherAgent extends Agent {
         Map.Entry<AID, ProposalData> best = null;
         for (Map.Entry<AID, ProposalData> candidate : rankedCandidates) {
             String candidateName = candidate.getKey().getLocalName();
-            if (tryReserveUnit(candidateName)) {
+            if (promotePendingToBusy(candidateName, eId)) {
                 best = candidate;
                 break;
             }
@@ -492,6 +541,7 @@ public class DispatcherAgent extends Agent {
             if (emergency != null) {
                 scheduleRetry(eId, emergency, "all candidates became busy");
             }
+            releaseAllPendingForConversation(eId);
             return;
         }
 
@@ -503,6 +553,8 @@ public class DispatcherAgent extends Agent {
                 + " with utility " + String.format("%.4f", bestUtility));
 
         assignedUnits.put(eId, winnerName);
+        appendIncidentEvent(baseIncidentId(eId), new IncidentEvent.Assigned(System.currentTimeMillis(), winnerName));
+        compareAndSetIncidentStatus(baseIncidentId(eId), IncidentStatus.PENDING, IncidentStatus.ASSIGNED);
         queuedIncidentIds.remove(eId);
         queuedIncidents.remove(eId);
         queueRounds.remove(eId);
@@ -517,6 +569,7 @@ public class DispatcherAgent extends Agent {
 
         for (Map.Entry<AID, ProposalData> entry : collector.getAll().entrySet()) {
             if (!entry.getKey().equals(winner)) {
+                releasePendingUnit(entry.getKey().getLocalName(), eId);
                 ACLMessage reject = entry.getValue().originalMessage.createReply();
                 reject.setPerformative(ACLMessage.REJECT_PROPOSAL);
                 reject.setContent("Emergency " + eId + " assigned to " + winnerName);
@@ -527,6 +580,34 @@ public class DispatcherAgent extends Agent {
 
         System.out.println("[" + getLocalName() + "] === ASSIGNMENT COMPLETE for " + eId + " ===");
         retryCounts.remove(eId);
+        pendingByConversation.remove(eId);
+
+        // Invariant: perimeter assignment must never outlive primary assignment.
+        // Start police perimeter CNP ONLY after a primary winner exists.
+        if (!isPoliceRole(eId)) {
+            maybeStartPolicePerimeterAfterPrimaryAssigned(baseIncidentId(eId));
+        }
+    }
+
+    private void maybeStartPolicePerimeterAfterPrimaryAssigned(String baseIncidentId) {
+        if (baseIncidentId == null) {
+            return;
+        }
+        Emergency emergency = emergencyData.get(baseIncidentId);
+        if (emergency == null || emergency.getType() == null) {
+            return;
+        }
+        String type = emergency.getType();
+        if (!type.equals("FIRE") && !type.equals("STRUCTURAL_COLLAPSE")) {
+            return;
+        }
+        // Only run perimeter CFP if we still have a primary assignment winner.
+        if (!assignedUnits.containsKey(baseIncidentId)) {
+            return;
+        }
+        System.out.println("[" + getLocalName() + "] Primary assigned for " + baseIncidentId
+                + " -> starting conditional police perimeter Contract Net");
+        startPoliceContractNet(baseIncidentId, emergency);
     }
 
     private void scheduleRetry(String eId, Emergency emergency, String reason) {
@@ -534,16 +615,27 @@ public class DispatcherAgent extends Agent {
             return;
         }
 
+        String baseEId = baseIncidentId(eId);
+        RetryContext ctx = retryContextByIncident.computeIfAbsent(baseEId, key -> new RetryContext());
+        long now = System.currentTimeMillis();
+        boolean shouldRetry = ctx.shouldRetryNow(now, reason, snapshotAvailableUnitsForService(baseEId, emergency));
+        if (!shouldRetry) {
+            System.out.println("[" + getLocalName() + "] Retry suppressed for " + baseEId
+                    + " (reason=" + reason + ", lastFailure=" + ctx.lastFailureReason + ", backoffMs=" + ctx.currentBackoffMs + ")");
+            return;
+        }
+
         int retries = retryCounts.getOrDefault(eId, 0);
         if (retries >= MAX_RETRIES) {
-            queueIncident(eId, emergency, reason);
+            markIncidentFailed(baseEId, "max retries exceeded: " + reason);
             return;
         }
 
         retryCounts.put(eId, retries + 1);
-        System.out.println("[" + getLocalName() + "] Retrying " + eId + " after " + reason
-                + " (" + (retries + 1) + "/" + MAX_RETRIES + ") in " + (RETRY_DELAY / 1000) + "s");
-        addBehaviour(new WakerBehaviour(this, RETRY_DELAY) {
+        long delay = ctx.currentBackoffMs;
+        System.out.println("[" + getLocalName() + "] Retrying " + baseEId + " after " + reason
+                + " (" + (retries + 1) + "/" + MAX_RETRIES + ") in " + (delay / 1000) + "s");
+        addBehaviour(new WakerBehaviour(this, delay) {
             @Override
             protected void onWake() {
                 if (isIncidentClosed(eId)) {
@@ -554,8 +646,43 @@ public class DispatcherAgent extends Agent {
         });
     }
 
+    private Set<String> snapshotAvailableUnitsForService(String incidentId, Emergency emergency) {
+        String baseEId = baseIncidentId(incidentId);
+        String serviceType = emergencyServiceType.get(baseEId);
+        if (serviceType == null || serviceType.trim().isEmpty()) {
+            serviceType = determineServiceType(emergency);
+        }
+        // We cannot reliably ask agents for internal state here; snapshot "available" from DF minus busy/pending.
+        Set<String> available = new LinkedHashSet<>();
+        DFAgentDescription template = new DFAgentDescription();
+        ServiceDescription sd = new ServiceDescription();
+        sd.setType(serviceType);
+        template.addServices(sd);
+        try {
+            DFAgentDescription[] results = DFService.search(this, template);
+            for (DFAgentDescription result : results) {
+                String local = result.getName().getLocalName();
+                synchronized (assignmentLock) {
+                    if (busyUnits.contains(local) || pendingUnits.contains(local)) {
+                        continue;
+                    }
+                }
+                available.add(local);
+            }
+        } catch (FIPAException e) {
+            // Treat DF failure as empty availability; retry gating will then rely on backoff.
+        }
+        return available;
+    }
+
     private boolean isIncidentClosed(String eId) {
-        return failedIncidents.contains(eId) || resolvedIncidents.contains(baseIncidentId(eId)) || assignedUnits.containsKey(eId);
+        IncidentStatus status = incidentStatus.get(baseIncidentId(eId));
+        return status == IncidentStatus.RESOLVED
+                || status == IncidentStatus.FAILED
+                || status == IncidentStatus.ABORTED
+                || failedIncidents.contains(eId)
+                || resolvedIncidents.contains(baseIncidentId(eId))
+                || assignedUnits.containsKey(eId);
     }
 
     private void queueIncident(String eId, Emergency emergency, String reason) {
@@ -568,11 +695,16 @@ public class DispatcherAgent extends Agent {
         emergencyData.put(eId, emergency);
         emergencyServiceType.put(eId, determineServiceType(emergency));
 
+        String baseEId = baseIncidentId(eId);
+        emergencyData.put(baseEId, emergency);
+        emergencyServiceType.put(baseEId, determineServiceType(emergency));
+
         if (queuedIncidentIds.add(eId)) {
             queuedIncidents.offer(eId);
             queueSince.putIfAbsent(eId, System.currentTimeMillis());
             System.out.println("[" + getLocalName() + "] *** INCIDENT QUEUED: " + eId
-                    + " after " + reason + ". Waiting for available " + emergencyServiceType.get(eId) + " unit. ***");
+                    + " after " + reason + ". Waiting for available " + emergencyServiceType.get(eId)
+                    + " unit. QueueDepth=" + queuedIncidents.size() + " ***");
         } else {
             System.out.println("[" + getLocalName() + "] Incident " + eId + " already queued; reason: " + reason);
         }
@@ -598,6 +730,10 @@ public class DispatcherAgent extends Agent {
         }
 
         int rounds = queueRounds.getOrDefault(eId, 0);
+        if (rounds >= MAX_QUEUE_ROUNDS) {
+            markIncidentFailed(eId, "exceeded maximum queue rounds");
+            return;
+        }
         queueRounds.put(eId, rounds + 1);
         System.out.println("[" + getLocalName() + "] Retrying queued incident " + eId
                 + " because " + unitName + " became idle (queue round " + (rounds + 1) + ")");
@@ -630,6 +766,10 @@ public class DispatcherAgent extends Agent {
         }
 
         int rounds = queueRounds.getOrDefault(eId, 0);
+        if (rounds >= MAX_QUEUE_ROUNDS) {
+            markIncidentFailed(eId, "exceeded maximum queue rounds");
+            return;
+        }
         queueRounds.put(eId, rounds + 1);
         System.out.println("[" + getLocalName() + "] Periodic retry for queued incident " + eId
                 + " (queue round " + (rounds + 1) + ")");
@@ -641,11 +781,11 @@ public class DispatcherAgent extends Agent {
             return false;
         }
 
-        String normalizedUnitName = unitName.toLowerCase();
+        String normalizedUnitName = unitName.toLowerCase(Locale.ROOT);
         switch (emergency.getType()) {
             case "FIRE":
             case "STRUCTURAL_COLLAPSE":
-                return normalizedUnitName.contains("firetruck");
+                return normalizedUnitName.contains("firetruck") || normalizedUnitName.contains("police");
             case "MEDICAL":
                 return normalizedUnitName.contains("ambulance");
             case "BIOHAZARD":
@@ -661,21 +801,28 @@ public class DispatcherAgent extends Agent {
             return;
         }
 
+        String baseEId = baseIncidentId(eId);
+        Emergency emergencyContext = emergencyData.get(baseEId);
+        if (emergencyContext != null) {
+            emergency = emergencyContext;
+        }
+        if (emergency == null) {
+            markIncidentFailed(eId, "missing emergency data");
+            return;
+        }
+
         retryCounts.remove(eId);
-        String serviceType = emergencyServiceType.get(eId);
+        String serviceType = emergencyServiceType.get(baseEId);
         if (serviceType == null || serviceType.trim().isEmpty()) {
             serviceType = determineServiceType(emergency);
-            emergencyServiceType.put(eId, serviceType);
-            System.out.println("[" + getLocalName() + "] Restored missing serviceType for " + eId + " => " + serviceType);
+            emergencyServiceType.put(baseEId, serviceType);
+            System.out.println("[" + getLocalName() + "] Restored missing serviceType for " + baseEId + " => " + serviceType);
         }
 
         ProposalCollector collector = new ProposalCollector(eId, serviceType, emergency);
         activeCollectors.put(eId, collector);
         searchAndSendCFP(serviceType, emergency, eId);
-
-        if (emergency.getType().equals("FIRE") || emergency.getType().equals("STRUCTURAL_COLLAPSE")) {
-            startPoliceContractNet(eId, emergency);
-        }
+        // Invariant: do not start perimeter CFP until primary is successfully assigned.
 
     }
 
@@ -683,15 +830,22 @@ public class DispatcherAgent extends Agent {
         if (!failedIncidents.add(eId)) {
             return;
         }
+        String baseEId = baseIncidentId(eId);
+        appendIncidentEvent(baseEId, new IncidentEvent.Failed(System.currentTimeMillis(), reason));
+        incidentStatus.put(baseEId, IncidentStatus.FAILED);
 
         activeCollectors.remove(eId);
         retryCounts.remove(eId);
+        retryContextByIncident.remove(baseEId);
         assignedUnits.remove(eId);
         queuedIncidentIds.remove(eId);
         queuedIncidents.remove(eId);
         queueRounds.remove(eId);
         queueSince.remove(eId);
         policeConversationParents.remove(eId);
+        policeConversationByIncident.remove(baseEId);
+        releaseAllPendingForConversation(eId);
+        releasePolicePerimeter(baseEId);
 
         System.out.println("[" + getLocalName() + "] *** INCIDENT FAILED: " + eId
                 + " after " + MAX_RETRIES + " retries. Reason: " + reason + " ***");
@@ -724,7 +878,9 @@ public class DispatcherAgent extends Agent {
 
     private void handleUnitStatusInform(ACLMessage inform) {
         String content = inform.getContent();
-        if (content != null && content.startsWith("UNIT_IDLE:")) {
+        if (content != null && (content.startsWith("UNIT_IDLE:")
+                || content.equals("IDLE")
+                || content.startsWith("IDLE:"))) {
             handleUnitIdle(inform);
         } else if (content != null && (content.startsWith("MISSION_ARRIVED:")
                 || content.startsWith("MISSION_COMPLETE:")
@@ -766,26 +922,49 @@ public class DispatcherAgent extends Agent {
             return;
         }
 
+        if ("MISSION_ARRIVED".equals(event)) {
+            appendIncidentEvent(eId, new IncidentEvent.Arrived(System.currentTimeMillis(), unitName));
+            compareAndSetIncidentStatus(eId, IncidentStatus.ASSIGNED, IncidentStatus.ACTIVE);
+        }
+
         if ("MISSION_COMPLETE".equals(event)) {
             System.out.println("[" + getLocalName() + "] Mission complete for " + eId + " by " + unitName);
+            appendIncidentEvent(eId, new IncidentEvent.Resolved(System.currentTimeMillis(), unitName));
+            compareAndSetIncidentStatus(eId, IncidentStatus.ASSIGNED, IncidentStatus.RESOLVED);
+            compareAndSetIncidentStatus(eId, IncidentStatus.ACTIVE, IncidentStatus.RESOLVED);
             resolvedIncidents.add(eId);
             assignedUnits.remove(eId);
-            releaseUnit(unitName);
+            forceReleaseUnit(unitName);
             releasePolicePerimeter(eId);
             notifyLogger("RESOLVED:" + eId + ":" + unitName);
         }
     }
 
     private void handleUnitIdle(ACLMessage inform) {
+        if (isDuplicateStatusMessage(inform)) {
+            return;
+        }
         String content = inform.getContent();
-        String[] parts = content.split(":");
-        String unitName = parts.length >= 2 ? parts[1] : inform.getSender().getLocalName();
-        releaseUnit(unitName);
-        System.out.println("[" + getLocalName() + "] Unit " + unitName + " is idle; freed from busy list");
+        String unitName = inform.getSender().getLocalName();
+        if (content != null) {
+            String[] parts = content.split(":");
+            if (parts.length >= 2) {
+                unitName = parts[1];
+            }
+        }
+        boolean released = forceReleaseUnit(unitName);
+        if (released) {
+            System.out.println("[" + getLocalName() + "] Unit " + unitName + " is idle; freed from busy list");
+        } else {
+            System.out.println("[" + getLocalName() + "] Duplicate IDLE for " + unitName + " ignored (already free)");
+        }
         retryQueuedIncidentsForUnit(unitName);
     }
 
     private void handleAbort(ACLMessage abort) {
+        if (isDuplicateStatusMessage(abort)) {
+            return;
+        }
         String content = abort.getContent();
         System.out.println("[" + getLocalName() + "] RECEIVED ABORT: " + content);
 
@@ -805,7 +984,7 @@ public class DispatcherAgent extends Agent {
         }
 
         if (unitName != null) {
-            releaseUnit(unitName);
+            forceReleaseUnit(unitName);
             System.out.println("[" + getLocalName() + "] Unit " + unitName + " freed from busy list");
         }
 
@@ -830,6 +1009,13 @@ public class DispatcherAgent extends Agent {
             }
 
             assignedUnits.remove(abortedEmergencyId);
+            appendIncidentEvent(abortedEmergencyId, new IncidentEvent.Aborted(System.currentTimeMillis(), unitName, reason));
+            compareAndSetIncidentStatus(abortedEmergencyId, IncidentStatus.ASSIGNED, IncidentStatus.ABORTED);
+            compareAndSetIncidentStatus(abortedEmergencyId, IncidentStatus.ACTIVE, IncidentStatus.ABORTED);
+            if (policeAssignments.containsKey(abortedEmergencyId)) {
+                System.out.println("[" + getLocalName() + "] Releasing perimeter due to primary abort on " + abortedEmergencyId);
+                releasePolicePerimeter(abortedEmergencyId);
+            }
             notifyLogger("ABORTED:" + abortedEmergencyId + ":" + unitName + ":" + reason);
             if (emergency != null) {
                 scheduleImmediateRetry(abortedEmergencyId, emergency, "assigned unit aborted: " + reason);
@@ -861,17 +1047,17 @@ public class DispatcherAgent extends Agent {
         ProposalCollector collector = new ProposalCollector(eId, serviceType, emergency);
         activeCollectors.put(eId, collector);
         searchAndSendCFP(serviceType, emergency, eId);
-
-        if (emergency.getType().equals("FIRE") || emergency.getType().equals("STRUCTURAL_COLLAPSE")) {
-            startPoliceContractNet(eId, emergency);
-        }
+        // Invariant: do not start perimeter CFP until primary is successfully assigned.
 
     }
 
     private void startPoliceContractNet(String eId, Emergency emergency) {
-        String policeKey = "POLICE::PERIMETER::" + eId + "::" + System.currentTimeMillis();
+        String baseEId = baseIncidentId(eId);
+        String policeKey = policeConversationByIncident.computeIfAbsent(
+                baseEId, key -> "POLICE::PERIMETER::" + key
+        );
         if (activeCollectors.containsKey(policeKey) || assignedUnits.containsKey(policeKey)) return;
-        policeConversationParents.put(policeKey, eId);
+        policeConversationParents.put(policeKey, baseEId);
         ProposalCollector collector = new ProposalCollector(policeKey, "CROWD_CONTROL", emergency);
         activeCollectors.put(policeKey, collector);
         searchAndSendCFPWithConversation("CROWD_CONTROL", emergency, policeKey);
@@ -886,19 +1072,30 @@ public class DispatcherAgent extends Agent {
             DFAgentDescription[] results = DFService.search(this, template);
             if (results.length == 0) {
                 System.out.println("[" + getLocalName() + "] No units found for " + serviceType + " (" + conversationId + ")");
+                if ("CROWD_CONTROL".equals(serviceType)) {
+                    int fallbackInvited = inviteFallbackRespondersForPerimeter(emergency, conversationId);
+                    startContractNetSession(conversationId, fallbackInvited);
+                } else {
+                    startContractNetSession(conversationId, 0);
+                }
                 return;
             }
             Set<String> invitedLocals = new LinkedHashSet<>();
             for (DFAgentDescription result : results) {
                 String local = result.getName().getLocalName();
                 synchronized (assignmentLock) {
-                    if (busyUnits.contains(local)) {
-                        System.out.println("[" + getLocalName() + "] Skipping CFP to busy unit " + local + " (" + conversationId + ")");
+                    if (busyUnits.contains(local) || pendingUnits.contains(local)) {
+                        System.out.println("[" + getLocalName() + "] Skipping CFP to unavailable unit " + local + " (" + conversationId + ")");
                         continue;
                     }
                 }
                 sendCFP(result.getName(), emergency, conversationId);
                 invitedLocals.add(local);
+            }
+            if ("CROWD_CONTROL".equals(serviceType) && invitedLocals.isEmpty()) {
+                int fallbackInvited = inviteFallbackRespondersForPerimeter(emergency, conversationId);
+                startContractNetSession(conversationId, fallbackInvited);
+                return;
             }
 
             startContractNetSession(conversationId, invitedLocals.size());
@@ -907,13 +1104,83 @@ public class DispatcherAgent extends Agent {
         }
     }
 
+    private int inviteFallbackRespondersForPerimeter(Emergency emergency, String conversationId) {
+        int invited = 0;
+        invited += inviteByServiceType("FIRE", emergency, conversationId);
+        invited += inviteByServiceType("RESCUE", emergency, conversationId);
+        if (invited > 0) {
+            System.out.println("[" + getLocalName() + "] Using cross-type fallback for perimeter: invited "
+                    + invited + " FIRE/RESCUE unit(s)");
+        }
+        return invited;
+    }
+
+    private int inviteByServiceType(String serviceType, Emergency emergency, String conversationId) {
+        DFAgentDescription template = new DFAgentDescription();
+        ServiceDescription sd = new ServiceDescription();
+        sd.setType(serviceType);
+        template.addServices(sd);
+        int invited = 0;
+        try {
+            DFAgentDescription[] results = DFService.search(this, template);
+            for (DFAgentDescription result : results) {
+                String local = result.getName().getLocalName();
+                synchronized (assignmentLock) {
+                    if (busyUnits.contains(local) || pendingUnits.contains(local)) {
+                        continue;
+                    }
+                }
+                sendCFP(result.getName(), emergency, conversationId);
+                invited++;
+            }
+        } catch (FIPAException e) {
+            e.printStackTrace();
+        }
+        return invited;
+    }
+
     private boolean isPoliceRole(String eId) {
         return eId != null && policeConversationParents.containsKey(eId);
     }
 
     private String baseIncidentId(String eId) {
         if (eId == null) return null;
-        return policeConversationParents.getOrDefault(eId, eId);
+        String current = eId;
+        while (current.startsWith("POLICE::PERIMETER::")) {
+            String prefix = "POLICE::PERIMETER::";
+            String remaining = current.substring(prefix.length());
+            int suffixIdx = remaining.lastIndexOf("::");
+            if (suffixIdx <= 0) {
+                current = remaining;
+                break;
+            }
+            current = remaining.substring(0, suffixIdx);
+        }
+        return current;
+    }
+
+    private void scheduleFinalizeRespectingMinWait(String conversationId) {
+        if (conversationId == null || conversationId.isEmpty()) {
+            return;
+        }
+        long remaining = 0;
+        synchronized (contractNetSessions) {
+            ContractNetSession session = contractNetSessions.get(conversationId);
+            if (session != null) {
+                long elapsed = System.currentTimeMillis() - session.startedAtMillis;
+                remaining = Math.max(0, MIN_PROPOSAL_WAIT - elapsed);
+            }
+        }
+        if (remaining == 0) {
+            finalizeContractNet(conversationId);
+            return;
+        }
+        addBehaviour(new WakerBehaviour(this, remaining) {
+            @Override
+            protected void onWake() {
+                finalizeContractNet(conversationId);
+            }
+        });
     }
 
     private void releasePolicePerimeter(String eId) {
@@ -921,27 +1188,136 @@ public class DispatcherAgent extends Agent {
         if (policeUnit == null) return;
         ACLMessage release = new ACLMessage(ACLMessage.INFORM);
         release.addReceiver(new AID(policeUnit, AID.ISLOCALNAME));
-        release.setContent("PERIMETER_RELEASED:" + eId);
+        // Invariant: perimeter must be releasable even while police is EN_ROUTE.
+        release.setContent("RELEASE_PERIMETER:" + eId);
         send(release);
-        releaseUnit(policeUnit);
+        forceReleaseUnit(policeUnit);
         assignedUnits.entrySet().removeIf(entry ->
                 policeUnit.equals(entry.getValue()) && isPoliceRole(entry.getKey()) && eId.equals(baseIncidentId(entry.getKey())));
+        policeConversationByIncident.remove(eId);
     }
 
-    private boolean tryReserveUnit(String unitName) {
+    // Visible for tests
+    void testSeedEmergency(String incidentId, Emergency emergency) {
+        emergencyData.put(incidentId, emergency);
+        emergencyServiceType.put(incidentId, determineServiceType(emergency));
+        incidentStatus.putIfAbsent(incidentId, IncidentStatus.PENDING);
+    }
+
+    // Visible for tests
+    boolean testHasPoliceConversation(String incidentId) {
+        return policeConversationByIncident.containsKey(incidentId);
+    }
+
+    // Visible for tests
+    void testMarkPrimaryAssigned(String incidentId, String unit) {
+        assignedUnits.put(incidentId, unit);
+    }
+
+    // Visible for tests
+    void testMaybeStartPerimeter(String incidentId) {
+        maybeStartPolicePerimeterAfterPrimaryAssigned(incidentId);
+    }
+
+    private boolean tryReservePendingUnit(String unitName, String conversationId) {
         synchronized (assignmentLock) {
+            if (unitName == null || conversationId == null) {
+                return false;
+            }
             if (busyUnits.contains(unitName)) {
                 return false;
+            }
+            String owner = pendingUnitOwners.get(unitName);
+            if (owner != null && !owner.equals(conversationId)) {
+                return false;
+            }
+            pendingUnits.add(unitName);
+            pendingUnitOwners.put(unitName, conversationId);
+            pendingByConversation.computeIfAbsent(conversationId, key -> new HashSet<>()).add(unitName);
+            return true;
+        }
+    }
+
+    private boolean promotePendingToBusy(String unitName, String conversationId) {
+        synchronized (assignmentLock) {
+            if (unitName == null || conversationId == null) {
+                return false;
+            }
+            if (busyUnits.contains(unitName)) {
+                return false;
+            }
+            String owner = pendingUnitOwners.get(unitName);
+            if (owner != null && !owner.equals(conversationId)) {
+                return false;
+            }
+            pendingUnits.remove(unitName);
+            pendingUnitOwners.remove(unitName);
+            Set<String> reserved = pendingByConversation.get(conversationId);
+            if (reserved != null) {
+                reserved.remove(unitName);
+                if (reserved.isEmpty()) {
+                    pendingByConversation.remove(conversationId);
+                }
             }
             busyUnits.add(unitName);
             return true;
         }
     }
 
-    private void releaseUnit(String unitName) {
-        if (unitName == null) return;
+    private void releasePendingUnit(String unitName, String conversationId) {
         synchronized (assignmentLock) {
-            busyUnits.remove(unitName);
+            if (unitName == null) {
+                return;
+            }
+            String owner = pendingUnitOwners.get(unitName);
+            if (owner == null || (conversationId != null && !owner.equals(conversationId))) {
+                return;
+            }
+            pendingUnits.remove(unitName);
+            pendingUnitOwners.remove(unitName);
+            Set<String> reserved = pendingByConversation.get(owner);
+            if (reserved != null) {
+                reserved.remove(unitName);
+                if (reserved.isEmpty()) {
+                    pendingByConversation.remove(owner);
+                }
+            }
+        }
+    }
+
+    private void releaseAllPendingForConversation(String conversationId) {
+        synchronized (assignmentLock) {
+            Set<String> units = pendingByConversation.remove(conversationId);
+            if (units == null) {
+                return;
+            }
+            for (String unit : units) {
+                String owner = pendingUnitOwners.get(unit);
+                if (conversationId.equals(owner)) {
+                    pendingUnitOwners.remove(unit);
+                    pendingUnits.remove(unit);
+                }
+            }
+        }
+    }
+
+    private boolean forceReleaseUnit(String unitName) {
+        if (unitName == null) return false;
+        synchronized (assignmentLock) {
+            boolean removed = busyUnits.remove(unitName);
+            String owner = pendingUnitOwners.remove(unitName);
+            if (owner != null) {
+                pendingUnits.remove(unitName);
+                Set<String> reserved = pendingByConversation.get(owner);
+                if (reserved != null) {
+                    reserved.remove(unitName);
+                    if (reserved.isEmpty()) {
+                        pendingByConversation.remove(owner);
+                    }
+                }
+                removed = true;
+            }
+            return removed;
         }
     }
 
@@ -949,6 +1325,8 @@ public class DispatcherAgent extends Agent {
         if (queuedIncidents.isEmpty()) return null;
 
         String bestId = null;
+        int bestHazmatPriority = Integer.MIN_VALUE;
+        int bestSeverity = Integer.MIN_VALUE;
         int bestRound = Integer.MIN_VALUE;
         long bestSince = Long.MAX_VALUE;
 
@@ -957,9 +1335,16 @@ public class DispatcherAgent extends Agent {
             if (emergency == null) continue;
             if (preferredUnitName != null && !isUnitCompatibleWithIncident(preferredUnitName, emergency)) continue;
 
+            int severity = emergency.getSeverity();
+            int hazmatPriority = isHazmatEmergency(emergency) ? 1 : 0;
             int rounds = queueRounds.getOrDefault(id, 0);
             long since = queueSince.getOrDefault(id, Long.MAX_VALUE);
-            if (rounds > bestRound || (rounds == bestRound && since < bestSince)) {
+            if (hazmatPriority > bestHazmatPriority
+                    || (hazmatPriority == bestHazmatPriority && severity > bestSeverity)
+                    || (hazmatPriority == bestHazmatPriority && severity == bestSeverity && rounds > bestRound)
+                    || (hazmatPriority == bestHazmatPriority && severity == bestSeverity && rounds == bestRound && since < bestSince)) {
+                bestHazmatPriority = hazmatPriority;
+                bestSeverity = severity;
                 bestRound = rounds;
                 bestSince = since;
                 bestId = id;
@@ -981,6 +1366,77 @@ public class DispatcherAgent extends Agent {
         send(log);
     }
 
+    private boolean isHazmatEmergency(Emergency emergency) {
+        if (emergency == null || emergency.getType() == null) {
+            return false;
+        }
+        String type = emergency.getType().toUpperCase(Locale.ROOT);
+        return "BIOHAZARD".equals(type) || "CRYOGENIC_LEAK".equals(type);
+    }
+
+    private boolean compareAndSetIncidentStatus(String incidentId, IncidentStatus expected, IncidentStatus next) {
+        if (incidentId == null) {
+            return false;
+        }
+        return incidentStatus.compute(incidentId, (key, current) -> {
+            if (current == null) {
+                return expected == null ? next : null;
+            }
+            return current == expected ? next : current;
+        }) == next;
+    }
+
+    private void appendIncidentEvent(String incidentId, IncidentEvent event) {
+        if (incidentId == null || event == null) {
+            return;
+        }
+        incidentEvents.computeIfAbsent(incidentId, key -> new ConcurrentLinkedQueue<>()).add(event);
+    }
+
+    private boolean isDuplicateStatusMessage(ACLMessage msg) {
+        String sender = msg.getSender() != null ? msg.getSender().getLocalName() : "unknown";
+        String content = msg.getContent() != null ? msg.getContent() : "";
+        String key = sender + "|" + content;
+        synchronized (recentMessageOrder) {
+            if (recentMessageIds.contains(key)) {
+                return true;
+            }
+            recentMessageIds.add(key);
+            recentMessageOrder.addLast(key);
+            while (recentMessageOrder.size() > MESSAGE_CACHE_LIMIT) {
+                String evicted = recentMessageOrder.pollFirst();
+                if (evicted != null) {
+                    recentMessageIds.remove(evicted);
+                }
+            }
+            return false;
+        }
+    }
+
+    // Visible for tests
+    boolean testTransitionStatus(String incidentId, String expected, String next) {
+        IncidentStatus expectedStatus = expected == null ? null : IncidentStatus.valueOf(expected);
+        IncidentStatus nextStatus = IncidentStatus.valueOf(next);
+        return compareAndSetIncidentStatus(incidentId, expectedStatus, nextStatus);
+    }
+
+    // Visible for tests
+    String testCurrentStatus(String incidentId) {
+        IncidentStatus status = incidentStatus.get(incidentId);
+        return status == null ? null : status.name();
+    }
+
+    // Visible for tests
+    int testEventCount(String incidentId) {
+        Queue<IncidentEvent> events = incidentEvents.get(incidentId);
+        return events == null ? 0 : events.size();
+    }
+
+    // Visible for tests
+    void testAppendDetected(String incidentId, String type) {
+        appendIncidentEvent(incidentId, new IncidentEvent.Detected(System.currentTimeMillis(), type));
+    }
+
     @Override
     protected void takeDown() {
         try {
@@ -989,6 +1445,22 @@ public class DispatcherAgent extends Agent {
             e.printStackTrace();
         }
         System.out.println("[" + getLocalName() + "] DispatcherAgent terminated");
+    }
+
+    private enum IncidentStatus {
+        PENDING, ASSIGNED, ACTIVE, RESOLVED, ABORTED, FAILED
+    }
+
+    private sealed interface IncidentEvent permits IncidentEvent.Detected, IncidentEvent.Assigned,
+            IncidentEvent.Arrived, IncidentEvent.Aborted, IncidentEvent.Resolved, IncidentEvent.Failed {
+        long ts();
+
+        record Detected(long ts, String type) implements IncidentEvent {}
+        record Assigned(long ts, String unitName) implements IncidentEvent {}
+        record Arrived(long ts, String unitName) implements IncidentEvent {}
+        record Aborted(long ts, String unitName, String reason) implements IncidentEvent {}
+        record Resolved(long ts, String unitName) implements IncidentEvent {}
+        record Failed(long ts, String reason) implements IncidentEvent {}
     }
 
     private static class ProposalData {
@@ -1042,12 +1514,14 @@ public class DispatcherAgent extends Agent {
     private static final class ContractNetSession {
         private final String conversationId;
         private final int invitedCount;
+        private final long startedAtMillis;
         private final Set<String> responders = new HashSet<>();
         private boolean finalized = false;
 
         ContractNetSession(String conversationId, int invitedCount) {
             this.conversationId = conversationId;
             this.invitedCount = invitedCount;
+            this.startedAtMillis = System.currentTimeMillis();
         }
 
         synchronized boolean tryFinalize() {
@@ -1066,5 +1540,52 @@ public class DispatcherAgent extends Agent {
             responders.add(responderLocalName);
             return responders.size() >= invitedCount;
         }
+    }
+
+    /**
+     * Per-incident retry memory to avoid blind, identical retries when nothing changed.
+     * Invariant: we only retry if something improved OR exponential backoff elapsed.
+     */
+    private static final class RetryContext {
+        private long lastRetryTimeMs = 0;
+        private String lastFailureReason = null;
+        private Set<String> availableUnitsAtLastRetry = Set.of();
+        private long currentBackoffMs = RETRY_DELAY; // 5s, 10s, 20s, max 60s
+
+        synchronized boolean shouldRetryNow(long nowMs, String failureReason, Set<String> availableNow) {
+            if (availableNow == null) {
+                availableNow = Set.of();
+            }
+            boolean unitBecameAvailable = availableUnitsAtLastRetry == null
+                    || (!availableNow.isEmpty() && !availableNow.equals(availableUnitsAtLastRetry));
+            boolean backoffElapsed = lastRetryTimeMs == 0 || (nowMs - lastRetryTimeMs) >= currentBackoffMs;
+
+            // Update context only if we are going to schedule a retry.
+            if (unitBecameAvailable || backoffElapsed) {
+                lastRetryTimeMs = nowMs;
+                lastFailureReason = failureReason;
+                availableUnitsAtLastRetry = Set.copyOf(availableNow);
+                currentBackoffMs = Math.min(60_000, currentBackoffMs * 2);
+                return true;
+            }
+            lastFailureReason = failureReason;
+            return false;
+        }
+    }
+
+    // Visible for tests
+    boolean testRetryGate(String incidentId, long nowMs, String reason, Set<String> availableNow) {
+        RetryContext ctx = retryContextByIncident.computeIfAbsent(incidentId, key -> new RetryContext());
+        return ctx.shouldRetryNow(nowMs, reason, availableNow);
+    }
+
+    // Visible for tests
+    void testMarkFailed(String incidentId, String reason) {
+        markIncidentFailed(incidentId, reason);
+    }
+
+    // Visible for tests
+    boolean testIsFailed(String incidentId) {
+        return failedIncidents.contains(incidentId) || incidentStatus.get(incidentId) == IncidentStatus.FAILED;
     }
 }

@@ -373,10 +373,14 @@ public class LoggerAgent extends Agent {
         int responseCount = responseTimesByType.values().stream().mapToInt(List::size).sum();
         double avgResponse = responseCount > 0 ? (double) totalResponseTime / responseCount : 0;
 
-        // Calculate unresolved: detected but never assigned and not aborted
+        // Calculate unresolved: includes never-assigned and assigned-but-never-resolved incidents.
         unresolvedCount = 0;
         for (String eId : detectedIncidents) {
-            if (!assignedIncidents.contains(eId) && !abortedIncidents.contains(eId) && !failedIncidents.contains(eId)) {
+            boolean wasResolved = resolvedIncidents.contains(eId);
+            boolean wasAborted = abortedIncidents.contains(eId);
+            boolean wasFailed = failedIncidents.contains(eId);
+
+            if (!wasResolved && !wasAborted && !wasFailed) {
                 unresolvedCount++;
             }
         }

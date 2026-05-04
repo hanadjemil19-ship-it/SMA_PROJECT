@@ -16,6 +16,7 @@ import jade.lang.acl.MessageTemplate;
 
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 public class BiohazardContainmentUnitAgent extends Agent {
 
@@ -31,10 +32,17 @@ public class BiohazardContainmentUnitAgent extends Agent {
     private Emergency assignedEmergency = null;
     private String currentMissionId = null;
 
-    private int suitIntegrity = 100;
+    /**
+     * Invariant: suit integrity is stored in exactly one place and is visible across threads.
+     * Any read/write must go through this AtomicInteger.
+     */
+    private final AtomicInteger suitIntegrity = new AtomicInteger(100);
     private static final int SUIT_DEGRADATION_PER_MISSION = 30;
     private static final int SUIT_THRESHOLD = 20;
+    private static final int MIN_SUIT_FOR_LOW_RISK_RESPONSE = 70;
+    private static final int LOW_RISK_MAX_SEVERITY = 3;
     private static final int DECONTAMINATION_TIME_MS = 6000;
+    private static final Location BASE_LOCATION = new Location(80, 80);
 
     @Override
     protected void setup() {
@@ -43,7 +51,7 @@ public class BiohazardContainmentUnitAgent extends Agent {
         getContentManager().registerLanguage(new SLCodec());
         getContentManager().registerOntology(EmergencyOntology.getInstance());
 
-        movement = new MovementBehaviour(this, 150, new Location(80, 80), getLocalName());
+        movement = new MovementBehaviour(this, 150, BASE_LOCATION, getLocalName());
         addBehaviour(movement);
 
         registerInDF();
@@ -105,19 +113,20 @@ public class BiohazardContainmentUnitAgent extends Agent {
             Emergency emergency = hasEmergency.getEmergency();
             String eId = cfp.getConversationId();
 
-            if (state == State.IDLE && workload == 0 && suitIntegrity > SUIT_THRESHOLD) {
+            if (state == State.IDLE && workload == 0 && canAcceptWithCurrentSuit(emergency)) {
                 pendingEmergencies.put(eId, emergency);
             }
 
             System.out.println("[" + getLocalName() + "] Received CFP for: " + emergency.getId());
-            System.out.println("[" + getLocalName() + "] Suit integrity: " + suitIntegrity + "%");
+            System.out.println("[" + getLocalName() + "] Suit integrity READ(CFP): " + suitIntegrity.get() + "%");
 
             ACLMessage reply = cfp.createReply();
 
-            if (suitIntegrity <= SUIT_THRESHOLD) {
+            if (!canAcceptWithCurrentSuit(emergency)) {
                 reply.setPerformative(ACLMessage.REFUSE);
                 reply.setContent("COMPROMISED_SUIT");
-                System.out.println("[" + getLocalName() + "] Sending REFUSE - COMPROMISED SUIT! (" + suitIntegrity + "%)");
+                System.out.println("[" + getLocalName() + "] Sending REFUSE - COMPROMISED SUIT! ("
+                        + suitIntegrity.get() + "%)");
 
             } else if (state == State.IDLE && workload == 0) {
                 reply.setPerformative(ACLMessage.PROPOSE);
@@ -191,14 +200,17 @@ public class BiohazardContainmentUnitAgent extends Agent {
             sendLifecycleInform("MISSION_ARRIVED", currentMissionId);
             System.out.println("[" + getLocalName() + "] ACTIVE - containing hazard for " + assignedEmergency.getId());
 
-            suitIntegrity -= SUIT_DEGRADATION_PER_MISSION;
-            System.out.println("[" + getLocalName() + "] Suit degraded. Remaining integrity: " + suitIntegrity + "%");
+            int afterDegrade = suitIntegrity.updateAndGet(prev -> {
+                int next = prev - SUIT_DEGRADATION_PER_MISSION;
+                return Math.max(0, next);
+            });
+            System.out.println("[" + getLocalName() + "] Suit integrity WRITE(DEGRADE): " + afterDegrade + "%");
             
-            if (suitIntegrity <= SUIT_THRESHOLD && currentMissionId != null && state == State.ACTIVE) {
+            if (afterDegrade <= SUIT_THRESHOLD && currentMissionId != null && state == State.ACTIVE) {
                 sendAbortToDispatcher(currentMissionId, "COMPROMISED_SUIT");
                 transitionTo(State.RETURNING);
                 workload = 0;
-                movement.setTarget(new Location(80, 80), () -> {
+                movement.setTarget(BASE_LOCATION, () -> {
                     startDecontamination();
                 });
                 return;
@@ -212,15 +224,16 @@ public class BiohazardContainmentUnitAgent extends Agent {
                     transitionTo(State.RETURNING);
                     workload = 0;
 
-                    movement.setTarget(new Location(80, 80), () -> {
-                        if (suitIntegrity <= SUIT_THRESHOLD || assignedEmergency.getType().equals("BIOHAZARD")) {
+                    movement.setTarget(BASE_LOCATION, () -> {
+                        if (shouldDecontaminateAfterMission(assignedEmergency)) {
                             startDecontamination();
                         } else {
                             transitionTo(State.IDLE);
                             assignedEmergency = null;
                             currentMissionId = null;
                             notifyDispatcherIdle();
-                            System.out.println("[" + getLocalName() + "] Back at base, suit integrity: " + suitIntegrity + "%, READY");
+                            System.out.println("[" + getLocalName() + "] Back at base, suit integrity READ(BASE): "
+                                    + suitIntegrity.get() + "%, READY");
                         }
                     });
                 }
@@ -230,11 +243,22 @@ public class BiohazardContainmentUnitAgent extends Agent {
 
     private void startDecontamination() {
         transitionTo(State.DECONTAMINATING);
-        System.out.println("[" + getLocalName() + "] DECONTAMINATING AND REPLACING SUIT... (" + DECONTAMINATION_TIME_MS + "ms)");
+        final int expectedDegradedValue = suitIntegrity.get();
+        System.out.println("[" + getLocalName() + "] DECONTAMINATING AND REPLACING SUIT... (" + DECONTAMINATION_TIME_MS
+                + "ms, expected=" + expectedDegradedValue + "%)");
         addBehaviour(new WakerBehaviour(this, DECONTAMINATION_TIME_MS) {
             @Override
             protected void onWake() {
-                suitIntegrity = 100;
+                // Invariant: replacement must be monotonic (no "phantom re-degrade" after replacement).
+                // We only replace if the current integrity is still the degraded value we observed when starting decon.
+                int before = suitIntegrity.get();
+                boolean replaced = suitIntegrity.compareAndSet(expectedDegradedValue, 100);
+                if (!replaced) {
+                    // If something changed it, force to 100 anyway but keep evidence in logs.
+                    suitIntegrity.set(100);
+                }
+                System.out.println("[" + getLocalName() + "] Suit integrity WRITE(REPLACE): "
+                        + before + "% -> " + suitIntegrity.get() + "% (CAS expected=" + expectedDegradedValue + "%, ok=" + replaced + ")");
                 transitionTo(State.IDLE);
                 assignedEmergency = null;
                 currentMissionId = null;
@@ -242,6 +266,33 @@ public class BiohazardContainmentUnitAgent extends Agent {
                 System.out.println("[" + getLocalName() + "] Suit REPLACED to 100%, READY for next call");
             }
         });
+    }
+
+    private boolean canAcceptWithCurrentSuit(Emergency emergency) {
+        int current = suitIntegrity.get();
+        System.out.println("[" + getLocalName() + "] Suit integrity READ(ACCEPT?): " + current + "%");
+        if (current <= SUIT_THRESHOLD) {
+            return false;
+        }
+        if (emergency == null) {
+            return current >= MIN_SUIT_FOR_LOW_RISK_RESPONSE;
+        }
+        if (emergency.getSeverity() <= LOW_RISK_MAX_SEVERITY) {
+            return current >= MIN_SUIT_FOR_LOW_RISK_RESPONSE;
+        }
+        return current > SUIT_THRESHOLD;
+    }
+
+    private boolean shouldDecontaminateAfterMission(Emergency emergency) {
+        int current = suitIntegrity.get();
+        System.out.println("[" + getLocalName() + "] Suit integrity READ(DECON?): " + current + "%");
+        if (current <= SUIT_THRESHOLD) {
+            return true;
+        }
+        if (emergency == null) {
+            return false;
+        }
+        return emergency.getSeverity() > LOW_RISK_MAX_SEVERITY;
     }
 
     private void handleReject(ACLMessage reject) {
@@ -295,5 +346,20 @@ public class BiohazardContainmentUnitAgent extends Agent {
             e.printStackTrace();
         }
         System.out.println("[" + getLocalName() + "] BiohazardContainmentUnitAgent terminated");
+    }
+
+    // Visible for tests (package-private): deterministic unit test without spinning up JADE runtime.
+    int testSuitIntegrityRead() {
+        return suitIntegrity.get();
+    }
+
+    // Visible for tests (package-private)
+    void testSuitIntegritySet(int value) {
+        suitIntegrity.set(value);
+    }
+
+    // Visible for tests (package-private)
+    boolean testSuitIntegrityCas(int expected, int update) {
+        return suitIntegrity.compareAndSet(expected, update);
     }
 }
