@@ -121,13 +121,13 @@ public class PoliceAgent extends Agent {
         dfd.addServices(sd1);
 
         ServiceDescription sd2 = new ServiceDescription();
-        sd2.setType("TRAFFIC_CONTROL");
-        sd2.setName("police-access");
+        sd2.setType("PERIMETER");
+        sd2.setName("police-perimeter");
         dfd.addServices(sd2);
 
         try {
             DFService.register(this, dfd);
-            System.out.println("[" + getLocalName() + "] Registered in DF as CROWD_CONTROL and TRAFFIC_CONTROL");
+            System.out.println("[" + getLocalName() + "] Registered in DF as CROWD_CONTROL and PERIMETER");
         } catch (FIPAException e) {
             e.printStackTrace();
         }

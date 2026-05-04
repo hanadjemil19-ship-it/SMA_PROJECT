@@ -37,13 +37,17 @@ public class Main {
 
             // Keep alive
             System.out.println("Press ENTER to stop...");
-            System.in.read();
+            Thread.sleep(35000);
+            System.out.println("Shutting down JADE gracefully...");
+            mainContainer.kill();
 
         } catch (Exception e) {
             e.printStackTrace();
         } finally {
             try {
                 runtime.shutDown();
+                Thread.sleep(1000);
+                System.exit(0);
             } catch (Exception e) {
                 e.printStackTrace();
             }

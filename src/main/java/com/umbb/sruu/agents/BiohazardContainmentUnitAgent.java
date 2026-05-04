@@ -94,14 +94,21 @@ public class BiohazardContainmentUnitAgent extends Agent {
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
 
+        // Service interne utilisé par le Dispatcher pour router les incidents BIOHAZARD/CRYOGENIC_LEAK
         ServiceDescription sd1 = new ServiceDescription();
         sd1.setType("HAZMAT");
         sd1.setName("bcu-containment");
         dfd.addServices(sd1);
 
+        // Service formel exigé par le cahier des charges
+        ServiceDescription sd2 = new ServiceDescription();
+        sd2.setType("BIOHAZARD_CONTAINMENT");
+        sd2.setName("bcu-biohazard-containment");
+        dfd.addServices(sd2);
+
         try {
             DFService.register(this, dfd);
-            System.out.println("[" + getLocalName() + "] Registered in DF as HAZMAT");
+            System.out.println("[" + getLocalName() + "] Registered in DF as HAZMAT and BIOHAZARD_CONTAINMENT");
         } catch (FIPAException e) {
             e.printStackTrace();
         }
