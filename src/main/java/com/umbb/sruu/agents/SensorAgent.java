@@ -76,7 +76,7 @@ public class SensorAgent extends Agent {
         Emergency emergency = new Emergency();
         emergency.setId(globalId);
 
-        String[] types = {"FIRE", "MEDICAL", "STRUCTURAL_COLLAPSE", "BIOHAZARD", "CRYOGENIC_LEAK"};
+        String[] types = {"FIRE", "MEDICAL", "STRUCTURAL_COLLAPSE"};
         emergency.setType(types[random.nextInt(types.length)]);
 
         emergency.setSeverity(random.nextInt(5) + 1);

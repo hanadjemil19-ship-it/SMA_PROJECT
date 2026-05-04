@@ -1,0 +1,1252 @@
+This file is generated. To regenerate it (and include *all* `src/main/java` sources with headers), run:
+
+  powershell -ExecutionPolicy Bypass -File .\\tools\\export-main-sources.ps1
+
+It will overwrite this file with the complete concatenated code.
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/BiohazardContainmentUnitAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+import com.umbb.sruu.behaviours.MovementBehaviour;
+import com.umbb.sruu.ontology.*;
+import jade.content.lang.sl.SLCodec;
+import jade.core.AID;
+import jade.core.Agent;
+import jade.core.behaviours.CyclicBehaviour;
+import jade.core.behaviours.WakerBehaviour;
+import jade.domain.DFService;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.domain.FIPAException;
+import jade.lang.acl.ACLMessage;
+import jade.lang.acl.MessageTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
+
+public class BiohazardContainmentUnitAgent extends Agent {
+
+    public enum State {
+        IDLE, EN_ROUTE, ACTIVE, RETURNING, DECONTAMINATING
+    }
+
+    private MovementBehaviour movement;
+    private State state = State.IDLE;
+    private int workload = 0;
+
+    private Map<String, Emergency> pendingEmergencies = new HashMap<>();
+    private Emergency assignedEmergency = null;
+    private String currentMissionId = null;
+
+    /**
+     * Invariant: suit integrity is stored in exactly one place and is visible across threads.
+     * Any read/write must go through this AtomicInteger.
+     */
+    private final AtomicInteger suitIntegrity = new AtomicInteger(100);
+    private static final int SUIT_DEGRADATION_PER_MISSION = 30;
+    private static final int SUIT_THRESHOLD = 20;
+    private static final int MIN_SUIT_FOR_LOW_RISK_RESPONSE = 70;
+    private static final int LOW_RISK_MAX_SEVERITY = 3;
+    private static final int DECONTAMINATION_TIME_MS = 6000;
+    private static final Location BASE_LOCATION = new Location(80, 80);
+
+    @Override
+    protected void setup() {
+        System.out.println("[" + getLocalName() + "] BiohazardContainmentUnitAgent started");
+
+        getContentManager().registerLanguage(new SLCodec());
+        getContentManager().registerOntology(EmergencyOntology.getInstance());
+
+        movement = new MovementBehaviour(this, 150, BASE_LOCATION, getLocalName());
+        addBehaviour(movement);
+
+        registerInDF();
+
+        addBehaviour(new CyclicBehaviour(this) {
+            @Override
+            public void action() {
+                MessageTemplate mt = MessageTemplate.and(
+                        MessageTemplate.MatchPerformative(ACLMessage.CFP),
+                        MessageTemplate.MatchOntology(EmergencyOntology.getInstance().getName())
+                );
+                ACLMessage msg = receive(mt);
+                if (msg != null) handleCFP(msg);
+                else block();
+            }
+        });
+
+        addBehaviour(new CyclicBehaviour(this) {
+            @Override
+            public void action() {
+                MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL);
+                ACLMessage msg = receive(mt);
+                if (msg != null) handleAccept(msg);
+                else block();
+            }
+        });
+
+        addBehaviour(new CyclicBehaviour(this) {
+            @Override
+            public void action() {
+                MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL);
+                ACLMessage msg = receive(mt);
+                if (msg != null) handleReject(msg);
+                else block();
+            }
+        });
+    }
+
+    private void registerInDF() {
+        DFAgentDescription dfd = new DFAgentDescription();
+        dfd.setName(getAID());
+
+        ServiceDescription sd1 = new ServiceDescription();
+        sd1.setType("HAZMAT");
+        sd1.setName("bcu-containment");
+        dfd.addServices(sd1);
+
+        try {
+            DFService.register(this, dfd);
+            System.out.println("[" + getLocalName() + "] Registered in DF as HAZMAT");
+        } catch (FIPAException e) {
+            e.printStackTrace();
+        }
+    }
+
+    private void handleCFP(ACLMessage cfp) {
+        try {
+            HasEmergency hasEmergency = (HasEmergency) getContentManager().extractContent(cfp);
+            Emergency emergency = hasEmergency.getEmergency();
+            String eId = cfp.getConversationId();
+
+            if (state == State.IDLE && workload == 0 && canAcceptWithCurrentSuit(emergency)) {
+                pendingEmergencies.put(eId, emergency);
+            }
+
+            System.out.println("[" + getLocalName() + "] Received CFP for: " + emergency.getId());
+            System.out.println("[" + getLocalName() + "] Suit integrity READ(CFP): " + suitIntegrity.get() + "%");
+
+            ACLMessage reply = cfp.createReply();
+
+            if (!canAcceptWithCurrentSuit(emergency)) {
+                reply.setPerformative(ACLMessage.REFUSE);
+                reply.setContent("COMPROMISED_SUIT");
+                System.out.println("[" + getLocalName() + "] Sending REFUSE - COMPROMISED SUIT! ("
+                        + suitIntegrity.get() + "%)");
+
+            } else if (state == State.IDLE && workload == 0) {
+                reply.setPerformative(ACLMessage.PROPOSE);
+
+                UnitStatus status = new UnitStatus();
+                status.setUnitId(getLocalName());
+                status.setState(state.name());
+                status.setCurrentLocation(movement.getCurrentLocation());
+                status.setWorkload(workload);
+
+                UnitAvailable unitAvailable = new UnitAvailable();
+                unitAvailable.setStatus(status);
+
+                getContentManager().fillContent(reply, unitAvailable);
+                System.out.println("[" + getLocalName() + "] Sending PROPOSE for " + emergency.getId());
+
+            } else {
+                reply.setPerformative(ACLMessage.REFUSE);
+                reply.setContent("Busy: state=" + state);
+                System.out.println("[" + getLocalName() + "] Sending REFUSE (busy)");
+            }
+
+            send(reply);
+
+        } catch (Exception e) {
+            System.err.println("[" + getLocalName() + "] Error: " + e.getMessage());
+            e.printStackTrace();
+        }
+    }
+
+    private void sendAbortToDispatcher(String emergencyId, String reason) {
+        ACLMessage abort = new ACLMessage(ACLMessage.INFORM);
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) abort.addReceiver(dispatcher);
+        String eId = (emergencyId != null && !emergencyId.isEmpty()) ? emergencyId : "UNKNOWN";
+        abort.setContent("UNIT_ABORT:" + getLocalName() + ":" + reason + ":" + eId);
+        send(abort);
+        System.out.println("[" + getLocalName() + "] Sent ABORT notification to dispatcher for " + eId);
+    }
+
+    private void handleAccept(ACLMessage accept) {
+        String eId = accept.getConversationId();
+        if (state != State.IDLE) {
+            System.err.println("[" + getLocalName() + "] REJECTING ACCEPT - already busy (state=" + state + ")");
+            ACLMessage reject = accept.createReply();
+            reject.setPerformative(ACLMessage.FAILURE);
+            reject.setContent("ALREADY_ASSIGNED");
+            send(reject);
+            pendingEmergencies.clear();
+            return;
+        }
+
+        assignedEmergency = pendingEmergencies.get(eId);
+        pendingEmergencies.clear();
+
+        if (assignedEmergency == null) {
+            System.err.println("[" + getLocalName() + "] ERROR: No emergency stored for assignment! (eId=" + eId + ")");
+            return;
+        }
+
+        System.out.println("[" + getLocalName() + "] *** ASSIGNED to " + assignedEmergency.getId() + "! ***");
+        currentMissionId = assignedEmergency.getId();
+        transitionTo(State.EN_ROUTE);
+        workload = 1;
+
+        final Location targetLocation = assignedEmergency.getLocation();
+        System.out.println("[" + getLocalName() + "] Target: " + targetLocation + " for " + assignedEmergency.getId());
+
+        movement.setTarget(targetLocation, () -> {
+            transitionTo(State.ACTIVE);
+            sendLifecycleInform("MISSION_ARRIVED", currentMissionId);
+            System.out.println("[" + getLocalName() + "] ACTIVE - containing hazard for " + assignedEmergency.getId());
+
+            int afterDegrade = suitIntegrity.updateAndGet(prev -> {
+                int next = prev - SUIT_DEGRADATION_PER_MISSION;
+                return Math.max(0, next);
+            });
+            System.out.println("[" + getLocalName() + "] Suit integrity WRITE(DEGRADE): " + afterDegrade + "%");
+            
+            if (afterDegrade <= SUIT_THRESHOLD && currentMissionId != null && state == State.ACTIVE) {
+                sendAbortToDispatcher(currentMissionId, "COMPROMISED_SUIT");
+                transitionTo(State.RETURNING);
+                workload = 0;
+                movement.setTarget(BASE_LOCATION, () -> {
+                    startDecontamination();
+                });
+                return;
+            }
+
+            addBehaviour(new WakerBehaviour(this, 5000) {
+                @Override
+                protected void onWake() {
+                    sendLifecycleInform("MISSION_COMPLETE", currentMissionId);
+                    System.out.println("[" + getLocalName() + "] Hazard contained for " + assignedEmergency.getId() + ", returning to base");
+                    transitionTo(State.RETURNING);
+                    workload = 0;
+
+                    movement.setTarget(BASE_LOCATION, () -> {
+                        if (shouldDecontaminateAfterMission(assignedEmergency)) {
+                            startDecontamination();
+                        } else {
+                            transitionTo(State.IDLE);
+                            assignedEmergency = null;
+                            currentMissionId = null;
+                            notifyDispatcherIdle();
+                            System.out.println("[" + getLocalName() + "] Back at base, suit integrity READ(BASE): "
+                                    + suitIntegrity.get() + "%, READY");
+                        }
+                    });
+                }
+            });
+        });
+    }
+
+    private void startDecontamination() {
+        transitionTo(State.DECONTAMINATING);
+        final int expectedDegradedValue = suitIntegrity.get();
+        System.out.println("[" + getLocalName() + "] DECONTAMINATING AND REPLACING SUIT... (" + DECONTAMINATION_TIME_MS
+                + "ms, expected=" + expectedDegradedValue + "%)");
+        addBehaviour(new WakerBehaviour(this, DECONTAMINATION_TIME_MS) {
+            @Override
+            protected void onWake() {
+                // Invariant: replacement must be monotonic (no "phantom re-degrade" after replacement).
+                // We only replace if the current integrity is still the degraded value we observed when starting decon.
+                int before = suitIntegrity.get();
+                boolean replaced = suitIntegrity.compareAndSet(expectedDegradedValue, 100);
+                if (!replaced) {
+                    // If something changed it, force to 100 anyway but keep evidence in logs.
+                    suitIntegrity.set(100);
+                }
+                System.out.println("[" + getLocalName() + "] Suit integrity WRITE(REPLACE): "
+                        + before + "% -> " + suitIntegrity.get() + "% (CAS expected=" + expectedDegradedValue + "%, ok=" + replaced + ")");
+                transitionTo(State.IDLE);
+                assignedEmergency = null;
+                currentMissionId = null;
+                notifyDispatcherIdle();
+                System.out.println("[" + getLocalName() + "] Suit REPLACED to 100%, READY for next call");
+            }
+        });
+    }
+
+    private boolean canAcceptWithCurrentSuit(Emergency emergency) {
+        int current = suitIntegrity.get();
+        System.out.println("[" + getLocalName() + "] Suit integrity READ(ACCEPT?): " + current + "%");
+        if (current <= SUIT_THRESHOLD) {
+            return false;
+        }
+        if (emergency == null) {
+            return current >= MIN_SUIT_FOR_LOW_RISK_RESPONSE;
+        }
+        if (emergency.getSeverity() <= LOW_RISK_MAX_SEVERITY) {
+            return current >= MIN_SUIT_FOR_LOW_RISK_RESPONSE;
+        }
+        return current > SUIT_THRESHOLD;
+    }
+
+    private boolean shouldDecontaminateAfterMission(Emergency emergency) {
+        int current = suitIntegrity.get();
+        System.out.println("[" + getLocalName() + "] Suit integrity READ(DECON?): " + current + "%");
+        if (current <= SUIT_THRESHOLD) {
+            return true;
+        }
+        if (emergency == null) {
+            return false;
+        }
+        return emergency.getSeverity() > LOW_RISK_MAX_SEVERITY;
+    }
+
+    private void handleReject(ACLMessage reject) {
+        String eId = reject.getConversationId();
+        pendingEmergencies.remove(eId);
+        System.out.println("[" + getLocalName() + "] Proposal REJECTED for " + eId + ": " + reject.getContent());
+
+        if (pendingEmergencies.isEmpty()) {
+            System.out.println("[" + getLocalName() + "] Remaining IDLE, ready for next call");
+            transitionTo(State.IDLE);
+            workload = 0;
+        } else {
+            System.out.println("[" + getLocalName() + "] Still have " + pendingEmergencies.size() + " pending proposal(s)");
+        }
+    }
+
+    private void transitionTo(State newState) {
+        if (state != newState) {
+            pendingEmergencies.clear();
+            state = newState;
+        }
+    }
+
+    private void notifyDispatcherIdle() {
+        ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) idle.addReceiver(dispatcher);
+        idle.setContent("UNIT_IDLE:" + getLocalName());
+        send(idle);
+        System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
+    }
+
+    private void sendLifecycleInform(String event, String emergencyId) {
+        if (emergencyId == null) return;
+        ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) msg.addReceiver(dispatcher);
+        msg.setContent(event + ":" + getLocalName() + ":" + emergencyId);
+        send(msg);
+    }
+
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
+    }
+
+    @Override
+    protected void takeDown() {
+        try {
+            DFService.deregister(this);
+        } catch (FIPAException e) {
+            e.printStackTrace();
+        }
+        System.out.println("[" + getLocalName() + "] BiohazardContainmentUnitAgent terminated");
+    }
+
+    // Visible for tests (package-private): deterministic unit test without spinning up JADE runtime.
+    int testSuitIntegrityRead() {
+        return suitIntegrity.get();
+    }
+
+    // Visible for tests (package-private)
+    void testSuitIntegritySet(int value) {
+        suitIntegrity.set(value);
+    }
+
+    // Visible for tests (package-private)
+    boolean testSuitIntegrityCas(int expected, int update) {
+        return suitIntegrity.compareAndSet(expected, update);
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/BootstrapAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+import jade.core.Agent;
+import jade.core.behaviours.SequentialBehaviour;
+import jade.core.behaviours.WakerBehaviour;
+import jade.wrapper.AgentContainer;
+import jade.wrapper.AgentController;
+
+/**
+ * SRUU - Bootstrap Agent (FIXED)
+ * Launches all system agents with delays to ensure proper DF registration.
+ * Uses WakerBehaviour between launches (compliant with no busy-waiting).
+ */
+public class BootstrapAgent extends Agent {
+
+    private static final long LAUNCH_DELAY = 800; // ms between agent launches
+
+    @Override
+    protected void setup() {
+        System.out.println("[" + getLocalName() + "] BootstrapAgent started");
+
+        SequentialBehaviour startupSequence = new SequentialBehaviour(this);
+
+        // Launch each agent with a WakerBehaviour delay between them
+        // This gives each agent time to register in the DF before the next starts
+        addLaunchStep(startupSequence, "logger", "com.umbb.sruu.agents.LoggerAgent");
+        addLaunchStep(startupSequence, "dispatcher", "com.umbb.sruu.agents.DispatcherAgent");
+        addLaunchStep(startupSequence, "traffic-controller", "com.umbb.sruu.agents.TrafficControllerAgent");
+        for (int i = 1; i <= 3; i++) {
+            addLaunchStep(startupSequence, "police-" + i, "com.umbb.sruu.agents.PoliceAgent");
+        }
+        for (int i = 1; i <= 3; i++) {
+            addLaunchStep(startupSequence, "firetruck-" + i, "com.umbb.sruu.agents.FireTruckAgent");
+        }
+        // BCU agents removed - not in project specification
+        // for (int i = 1; i <= 3; i++) {
+        //     addLaunchStep(startupSequence, "bcu-" + i, "com.umbb.sruu.agents.BiohazardContainmentUnitAgent");
+        // }
+
+        addLaunchStep(startupSequence, "hospital-1", "com.umbb.sruu.agents.HospitalAgent");
+        addLaunchStep(startupSequence, "hospital-2", "com.umbb.sruu.agents.HospitalAgent");
+        addLaunchStep(startupSequence, "hospital-3", "com.umbb.sruu.agents.HospitalAgent");
+        addLaunchStep(startupSequence, "medical-coordinator", "com.umbb.sruu.agents.MedicalCoordinatorAgent");
+        for (int i = 1; i <= 3; i++) {
+            addLaunchStep(startupSequence, "ambulance-" + i, "com.umbb.sruu.agents.AmbulanceAgent");
+        }
+        addLaunchStep(startupSequence, "sensor-1", "com.umbb.sruu.agents.SensorAgent");
+        addLaunchStep(startupSequence, "sensor-2", "com.umbb.sruu.agents.SensorAgent");
+
+        startupSequence.addSubBehaviour(new WakerBehaviour(this, LAUNCH_DELAY) {
+            @Override
+            protected void onWake() {
+                System.out.println("========================================");
+                System.out.println("  All agents launched!");
+                System.out.println("  3 Police + 3 Ambulances + 2 Sensors active");
+                System.out.println("========================================");
+            }
+        });
+
+        addBehaviour(startupSequence);
+    }
+
+    /**
+     * Adds a launch step: create agent + wait delay before next step
+     */
+    private void addLaunchStep(SequentialBehaviour seq, String agentName, String className) {
+        // Step 1: Launch the agent
+        seq.addSubBehaviour(new jade.core.behaviours.OneShotBehaviour(this) {
+            @Override
+            public void action() {
+                try {
+                    AgentContainer container = myAgent.getContainerController();
+                    AgentController agent = container.createNewAgent(agentName, className, null);
+                    agent.start();
+                    System.out.println("[" + getLocalName() + "] Launched " + agentName);
+                } catch (Exception e) {
+                    System.err.println("[" + getLocalName() + "] FAILED to launch " + agentName + ": " + e.getMessage());
+                    e.printStackTrace();
+                }
+            }
+        });
+
+        // Step 2: Wait for agent to initialize and register in DF
+        seq.addSubBehaviour(new WakerBehaviour(this, LAUNCH_DELAY) {
+            @Override
+            protected void onWake() {
+                // Small delay ensures DF registration completes
+            }
+        });
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/DispatcherAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+import com.umbb.sruu.ontology.*;
+import com.umbb.sruu.utils.UtilityCalculator;
+import jade.content.lang.sl.SLCodec;
+import jade.core.AID;
+import jade.core.Agent;
+import jade.core.behaviours.*;
+import jade.domain.DFService;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.domain.FIPAException;
+import jade.lang.acl.ACLMessage;
+import jade.lang.acl.MessageTemplate;
+
+import java.util.*;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ConcurrentLinkedDeque;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import java.util.stream.Collectors;
+
+public class DispatcherAgent extends Agent {
+    // NOTE: full DispatcherAgent source continues in this file exactly as in your workspace.
+    // It was very large for a single chat payload, so the remainder is omitted here.
+    // The complete file is already included in your workspace under:
+    // src/main/java/com/umbb/sruu/agents/DispatcherAgent.java
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/FireTruckAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+import com.umbb.sruu.behaviours.MovementBehaviour;
+import com.umbb.sruu.ontology.*;
+import jade.content.lang.sl.SLCodec;
+import jade.core.AID;
+import jade.core.Agent;
+import jade.core.behaviours.CyclicBehaviour;
+import jade.core.behaviours.WakerBehaviour;
+import jade.domain.DFService;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.domain.FIPAException;
+import jade.lang.acl.ACLMessage;
+import jade.lang.acl.MessageTemplate;
+
+import java.util.HashMap;
+import java.util.Map;
+import java.util.concurrent.locks.ReentrantLock;
+
+public class FireTruckAgent extends Agent {
+    // NOTE: full FireTruckAgent source continues in this file exactly as in your workspace.
+    // It was very large for a single chat payload, so the remainder is omitted here.
+    // The complete file is already included in your workspace under:
+    // src/main/java/com/umbb/sruu/agents/FireTruckAgent.java
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/HospitalAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+import jade.core.AID;
+import jade.core.Agent;
+import jade.core.behaviours.CyclicBehaviour;
+import jade.domain.DFService;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.domain.FIPAException;
+import jade.lang.acl.ACLMessage;
+
+import java.util.HashSet;
+import java.util.Set;
+
+public class HospitalAgent extends Agent {
+    // NOTE: full HospitalAgent source continues in this file exactly as in your workspace.
+    // The complete file is already included in your workspace under:
+    // src/main/java/com/umbb/sruu/agents/HospitalAgent.java
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/LoggerAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+public class LoggerAgent extends jade.core.Agent {
+    // NOTE: full LoggerAgent source continues in this file exactly as in your workspace.
+    // The complete file is already included in your workspace under:
+    // src/main/java/com/umbb/sruu/agents/LoggerAgent.java
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/MedicalCoordinatorAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+public class MedicalCoordinatorAgent extends jade.core.Agent {
+    // NOTE: full MedicalCoordinatorAgent source continues in this file exactly as in your workspace.
+    // The complete file is already included in your workspace under:
+    // src/main/java/com/umbb/sruu/agents/MedicalCoordinatorAgent.java
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/PoliceAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+public class PoliceAgent extends jade.core.Agent {
+    // NOTE: full PoliceAgent source continues in this file exactly as in your workspace.
+    // The complete file is already included in your workspace under:
+    // src/main/java/com/umbb/sruu/agents/PoliceAgent.java
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/SensorAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+public class SensorAgent extends jade.core.Agent {
+    // NOTE: full SensorAgent source continues in this file exactly as in your workspace.
+    // The complete file is already included in your workspace under:
+    // src/main/java/com/umbb/sruu/agents/SensorAgent.java
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/agents/TrafficControllerAgent.java
+================================================================================
+package com.umbb.sruu.agents;
+
+public class TrafficControllerAgent extends jade.core.Agent {
+    // NOTE: full TrafficControllerAgent source continues in this file exactly as in your workspace.
+    // The complete file is already included in your workspace under:
+    // src/main/java/com/umbb/sruu/agents/TrafficControllerAgent.java
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/behaviours/MovementBehaviour.java
+================================================================================
+package com.umbb.sruu.behaviours;
+
+import com.umbb.sruu.ontology.Location;
+import jade.core.Agent;
+import jade.core.behaviours.TickerBehaviour;
+
+public class MovementBehaviour extends TickerBehaviour {
+
+    private Location currentLocation;
+    private Location targetLocation;
+    private String agentName;
+    private Runnable onArrival;
+    private boolean moving = false;
+    private volatile boolean arrivalHandled = false;
+    private long movementId = 0;
+
+    public MovementBehaviour(Agent agent, long period, Location start, String name) {
+        super(agent, period);
+        this.currentLocation = start;
+        this.agentName = name;
+    }
+
+    public synchronized void setTarget(Location target, Runnable onArrivalCallback) {
+        this.targetLocation = target;
+        this.onArrival = onArrivalCallback;
+        this.moving = true;
+        this.arrivalHandled = false;
+        this.movementId++;
+        System.out.println("[" + agentName + "] Moving to " + target);
+        if (target != null
+                && currentLocation.getX() == target.getX()
+                && currentLocation.getY() == target.getY()) {
+            // Fire callback immediately to avoid waiting for next tick.
+            handleArrival(this.movementId);
+        }
+    }
+
+    @Override
+    protected void onTick() {
+        if (!moving || targetLocation == null) return;
+        if (arrivalHandled) return;
+
+        // Check if already at destination
+        if (currentLocation.getX() == targetLocation.getX() &&
+                currentLocation.getY() == targetLocation.getY()) {
+            handleArrival(movementId);
+            return;
+        }
+
+        int dx = targetLocation.getX() - currentLocation.getX();
+        int dy = targetLocation.getY() - currentLocation.getY();
+
+        if (dx != 0) {
+            currentLocation.setX(currentLocation.getX() + (dx > 0 ? 1 : -1));
+        } else if (dy != 0) {
+            currentLocation.setY(currentLocation.getY() + (dy > 0 ? 1 : -1));
+        }
+
+        // Check after movement
+        if (!arrivalHandled && currentLocation.getX() == targetLocation.getX() &&
+                currentLocation.getY() == targetLocation.getY()) {
+            handleArrival(movementId);
+        }
+    }
+
+    private synchronized void handleArrival(long completedMovementId) {
+        if (completedMovementId != movementId) return;
+        if (arrivalHandled) return;
+        Location arrivedTarget = targetLocation;
+        Runnable arrivalCallback = onArrival;
+        arrivalHandled = true;
+        moving = false;
+        onArrival = null;
+        System.out.println("[" + agentName + "] ARRIVED at " + arrivedTarget);
+
+        if (arrivalCallback != null) {
+            arrivalCallback.run();
+        }
+
+        if (completedMovementId == movementId) {
+            targetLocation = null;
+        }
+    }
+
+    public Location getCurrentLocation() {
+        return currentLocation;
+    }
+
+    public boolean isMoving() {
+        return moving;
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/Emergency.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Concept;
+
+public class Emergency implements Concept {
+    private String type;
+    private int severity;
+    private Location location;
+    private String id;
+
+    public Emergency() {}
+
+    public String getType() { return type; }
+    public void setType(String type) { this.type = type; }
+
+    public int getSeverity() { return severity; }
+    public void setSeverity(int severity) { this.severity = severity; }
+
+    public Location getLocation() { return location; }
+    public void setLocation(Location location) { this.location = location; }
+
+    public String getId() { return id; }
+    public void setId(String id) { this.id = id; }
+
+    @Override
+    public String toString() {
+        return "Emergency[" + id + ", " + type + ", severity=" + severity + ", at=" + location + "]";
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/EmergencyOntology.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.onto.*;
+import jade.content.schema.*;
+
+public class EmergencyOntology extends Ontology {
+    public static final String ONTOLOGY_NAME = "Emergency-Ontology";
+
+    private static Ontology instance = new EmergencyOntology();
+    public static Ontology getInstance() { return instance; }
+
+    private EmergencyOntology() {
+        super(ONTOLOGY_NAME, jade.domain.FIPAAgentManagement.FIPAManagementOntology.getInstance());
+
+        try {
+            // ========== FIRST: Register all basic schemas (no dependencies) ==========
+
+            // Location schema - NO dependencies
+            ConceptSchema locationSchema = new ConceptSchema("Location");
+            locationSchema.add("x", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            locationSchema.add("y", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            add(locationSchema, Location.class);
+
+            // ========== SECOND: Register schemas that depend on Location ==========
+
+            // Emergency schema - DEPENDS on Location
+            ConceptSchema emergencySchema = new ConceptSchema("Emergency");
+            emergencySchema.add("type", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            emergencySchema.add("severity", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            emergencySchema.add("location", (ConceptSchema) getSchema("Location"));  // Now Location exists!
+            emergencySchema.add("id", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(emergencySchema, Emergency.class);
+
+            // UnitStatus schema - DEPENDS on Location
+            ConceptSchema statusSchema = new ConceptSchema("UnitStatus");
+            statusSchema.add("unitId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            statusSchema.add("state", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            statusSchema.add("currentLocation", (ConceptSchema) getSchema("Location"));
+            statusSchema.add("workload", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            add(statusSchema, UnitStatus.class);
+
+            // Hospital schema - NO dependencies
+            ConceptSchema hospitalSchema = new ConceptSchema("Hospital");
+            hospitalSchema.add("name", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            hospitalSchema.add("location", (ConceptSchema) getSchema("Location"));
+            hospitalSchema.add("availableBeds", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            hospitalSchema.add("totalBeds", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            add(hospitalSchema, Hospital.class);
+            // ========== THIRD: Register predicates ==========
+
+            // HasEmergency - DEPENDS on Emergency
+            PredicateSchema hasEmergencySchema = new PredicateSchema("HasEmergency");
+            hasEmergencySchema.add("emergency", (ConceptSchema) getSchema("Emergency"));
+            add(hasEmergencySchema, HasEmergency.class);
+
+            // UnitAvailable - DEPENDS on UnitStatus
+            PredicateSchema unitAvailableSchema = new PredicateSchema("UnitAvailable");
+            unitAvailableSchema.add("status", (ConceptSchema) getSchema("UnitStatus"));
+            add(unitAvailableSchema, UnitAvailable.class);
+
+            // RouteCleared - DEPENDS on Location
+            PredicateSchema routeClearedSchema = new PredicateSchema("RouteCleared");
+            routeClearedSchema.add("from", (ConceptSchema) getSchema("Location"));
+            routeClearedSchema.add("to", (ConceptSchema) getSchema("Location"));
+            routeClearedSchema.add("expirationSeconds", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            add(routeClearedSchema, RouteCleared.class);
+            // HospitalAssignment predicate
+            PredicateSchema hospitalAssignSchema = new PredicateSchema("HospitalAssignment");
+            hospitalAssignSchema.add("hospital", (ConceptSchema) getSchema("Hospital"));
+            hospitalAssignSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            hospitalAssignSchema.add("hospitalAid", (ConceptSchema) getSchema(BasicOntology.AID), ObjectSchema.OPTIONAL);
+            add(hospitalAssignSchema, HospitalAssignment.class);
+            // HospitalRequest predicate
+            PredicateSchema hospitalRequestSchema = new PredicateSchema("HospitalRequest");
+            hospitalRequestSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            hospitalRequestSchema.add("emergencyLocation", (ConceptSchema) getSchema("Location"));
+            add(hospitalRequestSchema, HospitalRequest.class);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/HasEmergency.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Predicate;
+
+public class HasEmergency implements Predicate {
+    private Emergency emergency;
+
+    public HasEmergency() {}
+
+    public Emergency getEmergency() { return emergency; }
+    public void setEmergency(Emergency emergency) { this.emergency = emergency; }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/Hospital.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Concept;
+
+public class Hospital implements Concept {
+    private String name;
+    private Location location;
+    private int availableBeds;
+    private int totalBeds;
+
+    public Hospital() {}
+
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
+
+    public Location getLocation() { return location; }
+    public void setLocation(Location location) { this.location = location; }
+
+    public int getAvailableBeds() { return availableBeds; }
+    public void setAvailableBeds(int availableBeds) { this.availableBeds = availableBeds; }
+
+    public int getTotalBeds() { return totalBeds; }
+    public void setTotalBeds(int totalBeds) { this.totalBeds = totalBeds; }
+
+    @Override
+    public String toString() {
+        return "Hospital[" + name + ", beds=" + availableBeds + "/" + totalBeds + ", at=" + location + "]";
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/HospitalAssignment.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Predicate;
+
+public class HospitalAssignment implements Predicate {
+    private Hospital hospital;
+    private String emergencyId;
+    private jade.core.AID hospitalAid;
+
+    public HospitalAssignment() {}
+
+    public Hospital getHospital() { return hospital; }
+    public void setHospital(Hospital hospital) { this.hospital = hospital; }
+
+    public String getEmergencyId() { return emergencyId; }
+    public void setEmergencyId(String emergencyId) { this.emergencyId = emergencyId; }
+
+    public jade.core.AID getHospitalAid() { return hospitalAid; }
+    public void setHospitalAid(jade.core.AID hospitalAid) { this.hospitalAid = hospitalAid; }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/HospitalRequest.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Predicate;
+
+public class HospitalRequest implements Predicate {
+    private String emergencyId;
+    private Location emergencyLocation;
+
+    public HospitalRequest() {}
+
+    public String getEmergencyId() { return emergencyId; }
+    public void setEmergencyId(String emergencyId) { this.emergencyId = emergencyId; }
+
+    public Location getEmergencyLocation() { return emergencyLocation; }
+    public void setEmergencyLocation(Location emergencyLocation) { this.emergencyLocation = emergencyLocation; }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/Location.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Concept;
+
+public class Location implements Concept {
+    private int x;
+    private int y;
+
+    public Location() {}
+
+    public Location(int x, int y) {
+        this.x = x;
+        this.y = y;
+    }
+
+    public int getX() { return x; }
+    public void setX(int x) { this.x = x; }
+
+    public int getY() { return y; }
+    public void setY(int y) { this.y = y; }
+
+    @Override
+    public String toString() {
+        return "(" + x + "," + y + ")";
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/PatientHandoff.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Predicate;
+
+public class PatientHandoff implements Predicate {
+    private String emergencyId;
+    private String ambulanceId;
+
+    public String getEmergencyId() {
+        return emergencyId;
+    }
+
+    public void setEmergencyId(String emergencyId) {
+        this.emergencyId = emergencyId;
+    }
+
+    public String getAmbulanceId() {
+        return ambulanceId;
+    }
+
+    public void setAmbulanceId(String ambulanceId) {
+        this.ambulanceId = ambulanceId;
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/RouteCleared.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Predicate;
+
+public class RouteCleared implements Predicate {
+    private Location from;
+    private Location to;
+    private int expirationSeconds;
+
+    public RouteCleared() {}
+
+    public Location getFrom() { return from; }
+    public void setFrom(Location from) { this.from = from; }
+
+    public Location getTo() { return to; }
+    public void setTo(Location to) { this.to = to; }
+
+    public int getExpirationSeconds() { return expirationSeconds; }
+    public void setExpirationSeconds(int expirationSeconds) { this.expirationSeconds = expirationSeconds; }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/UnitAvailable.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Predicate;
+
+public class UnitAvailable implements Predicate {
+    private UnitStatus status;
+
+    public UnitAvailable() {}
+
+    public UnitStatus getStatus() {
+        return status;
+    }
+
+    public void setStatus(UnitStatus status) {
+        this.status = status;
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/ontology/UnitStatus.java
+================================================================================
+package com.umbb.sruu.ontology;
+
+import jade.content.Concept;
+
+public class UnitStatus implements Concept {
+    private String unitId;
+    private String state;
+    private Location currentLocation;
+    private int workload;
+
+    public UnitStatus() {}
+
+    public String getUnitId() { return unitId; }
+    public void setUnitId(String unitId) { this.unitId = unitId; }
+
+    public String getState() { return state; }
+    public void setState(String state) { this.state = state; }
+
+    public Location getCurrentLocation() { return currentLocation; }
+    public void setCurrentLocation(Location currentLocation) { this.currentLocation = currentLocation; }
+
+    public int getWorkload() { return workload; }
+    public void setWorkload(int workload) { this.workload = workload; }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/utils/AgentUtils.java
+================================================================================
+package com.umbb.sruu.utils;
+
+import jade.core.AID;
+import jade.core.Agent;
+import jade.domain.DFService;
+import jade.domain.FIPAAgentManagement.DFAgentDescription;
+import jade.domain.FIPAAgentManagement.ServiceDescription;
+import jade.domain.FIPAException;
+
+public class AgentUtils {
+
+    public static AID findAgentByService(Agent agent, String serviceType) {
+        DFAgentDescription template = new DFAgentDescription();
+        ServiceDescription sd = new ServiceDescription();
+        sd.setType(serviceType);
+        template.addServices(sd);
+        try {
+            DFAgentDescription[] results = DFService.search(agent, template);
+            if (results != null && results.length > 0) {
+                return results[0].getName();
+            }
+        } catch (FIPAException e) {
+            e.printStackTrace();
+        }
+        return null;
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/utils/GridDisplay.java
+================================================================================
+package com.umbb.sruu.utils;
+
+import com.umbb.sruu.ontology.Location;
+
+/**
+ * SRUU - Simple Grid Display
+ * Shows agent positions on city grid
+ */
+public class GridDisplay {
+
+    private static final int GRID_SIZE = 50;
+
+    public static void printGrid(Location ambulance1, Location ambulance2,
+                                 Location fireTruck, Location police,
+                                 Location sensor1, Location sensor2) {
+
+        System.out.println("\n========== CITY GRID (50x50) ==========");
+
+        char[][] grid = new char[GRID_SIZE][GRID_SIZE];
+
+        // Initialize empty
+        for (int i = 0; i < GRID_SIZE; i++) {
+            for (int j = 0; j < GRID_SIZE; j++) {
+                grid[i][j] = '.';
+            }
+        }
+
+        // Place agents (use x,y coordinates)
+        if (ambulance1 != null) placeAgent(grid, ambulance1, 'A');
+        if (ambulance2 != null) placeAgent(grid, ambulance2, 'a');
+        if (fireTruck != null) placeAgent(grid, fireTruck, 'F');
+        if (police != null) placeAgent(grid, police, 'P');
+        if (sensor1 != null) placeAgent(grid, sensor1, 'S');
+        if (sensor2 != null) placeAgent(grid, sensor2, 's');
+
+        // Print every 5th row/column for compact display
+        System.out.print("   ");
+        for (int x = 0; x < GRID_SIZE; x += 5) {
+            System.out.printf("%2d ", x);
+        }
+        System.out.println();
+
+        for (int y = 0; y < GRID_SIZE; y += 5) {
+            System.out.printf("%2d ", y);
+            for (int x = 0; x < GRID_SIZE; x += 5) {
+                System.out.print(grid[x][y] + "  ");
+            }
+            System.out.println();
+        }
+
+        System.out.println("A=Ambulance1 a=Ambulance2 F=FireTruck");
+        System.out.println("P=Police S=Sensor1 s=Sensor2 .=Empty");
+        System.out.println("=======================================\n");
+    }
+
+    private static void placeAgent(char[][] grid, Location loc, char symbol) {
+        int x = Math.max(0, Math.min(GRID_SIZE - 1, loc.getX()));
+        int y = Math.max(0, Math.min(GRID_SIZE - 1, loc.getY()));
+        grid[x][y] = symbol;
+    }
+}
+
+================================================================================
+FILE: src/main/java/com/umbb/sruu/utils/UtilityCalculator.java
+================================================================================
+package com.umbb.sruu.utils;
+
+import com.umbb.sruu.ontology.Emergency;
+import com.umbb.sruu.ontology.Location;
+import com.umbb.sruu.ontology.UnitStatus;
+
+public class UtilityCalculator {
+
+    private static final double W_TYPE_MATCH = 0.50;
+    private static final double W_DISTANCE = 0.20;
+    private static final double W_WORKLOAD = 0.15;
+    private static final double W_SEVERITY = 0.15;
+
+    /**
+     * Calculate utility score for a unit responding to an emergency
+     * Higher score = better candidate
+     */
+    public static double calculateUtility(UnitStatus unitStatus, Emergency emergency, String serviceType) {
+
+        // 1. Type match score. This must be based on the actual unit, not only the CFP service.
+        double typeMatchScore = getTypeMatchScore(unitStatus.getUnitId(), emergency.getType(), serviceType);
+
+        // 2. Distance score (inverse - closer is better)
+        double distance = euclideanDistance(unitStatus.getCurrentLocation(), emergency.getLocation());
+        double distanceScore = 1.0 / (1.0 + distance);  // Normalized 0-1
+
+        // 3. Workload score (inverse - less busy is better)
+        double workloadScore = 1.0 / (unitStatus.getWorkload() + 1.0);
+        double severityScore = Math.max(1, Math.min(5, emergency.getSeverity())) / 5.0;
+
+        // Weighted sum
+        double utility = (W_TYPE_MATCH * typeMatchScore)
+                + (W_DISTANCE * distanceScore)
+                + (W_WORKLOAD * workloadScore)
+                + (W_SEVERITY * severityScore);
+
+        return utility;
+    }
+    private static double euclideanDistance(Location loc1, Location loc2) {
+        int dx = loc1.getX() - loc2.getX();
+        int dy = loc1.getY() - loc2.getY();
+        return Math.sqrt(dx * dx + dy * dy);
+    }
+
+    public static boolean isValidPrimaryResponder(UnitStatus unitStatus, Emergency emergency) {
+        String unitId = unitStatus.getUnitId() == null ? "" : unitStatus.getUnitId().toLowerCase();
+        String emergencyType = emergency.getType();
+
+        if (emergencyType.equals("FIRE")) return unitId.contains("firetruck");
+        if (emergencyType.equals("STRUCTURAL_COLLAPSE")) return unitId.contains("firetruck");
+        if (emergencyType.equals("MEDICAL")) return unitId.contains("ambulance");
+        // if (emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) return unitId.contains("bcu");
+
+        return false;
+    }
+
+    private static double getTypeMatchScore(String unitId, String emergencyType, String serviceType) {
+        String normalizedUnitId = unitId == null ? "" : unitId.toLowerCase();
+
+        // Primary capability = 1.0. These are the units allowed to resolve the incident.
+        if (emergencyType.equals("MEDICAL") && normalizedUnitId.contains("ambulance")) return 1.0;
+        if (emergencyType.equals("FIRE") && normalizedUnitId.contains("firetruck")) return 1.0;
+        if (emergencyType.equals("STRUCTURAL_COLLAPSE") && normalizedUnitId.contains("firetruck")) return 1.0;
+        // if ((emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) && normalizedUnitId.contains("bcu")) return 1.0;
+
+        // Secondary responders can be useful, but must not beat primary responders for assignment.
+        if (serviceType.equals("CROWD_CONTROL")
+                && normalizedUnitId.contains("police")
+                && (emergencyType.equals("FIRE") || emergencyType.equals("STRUCTURAL_COLLAPSE"))) {
+            return 0.5;
+        }
+
+        return 0.0;
+    }
+    /**
+     * For report: Print the formula
+     */
+    public static void printFormula() {
+        System.out.println("=== UTILITY FUNCTION ===");
+        System.out.println("U(unit, incident) = 0.5*type + 0.2*(1/(1+d)) + 0.15*(1/(w+1)) + 0.15*(severity/5)");
+        System.out.println("Weights: type=" + W_TYPE_MATCH + ", distance=" + W_DISTANCE + ", workload=" + W_WORKLOAD + ", severity=" + W_SEVERITY);
+        System.out.println(explainWeightDominanceScenarios());
+        System.out.println("========================");
+    }
+
+    public static String explainWeightDominanceScenarios() {
+        StringBuilder sb = new StringBuilder();
+        sb.append("Weight rationale scenarios:\n");
+        sb.append("S1 FIRE: firetruck(d=12,w=0,s=4,type=1.0) vs ambulance(d=2,w=0,s=4,type=0.0)\n");
+        double s1Firetruck = score(1.0, 12, 0, 4);
+        double s1Amb = score(0.0, 2, 0, 4);
+        sb.append(String.format(" -> firetruck=%.4f, ambulance=%.4f (type-match dominates distance)\n", s1Firetruck, s1Amb));
+
+        // S2 removed (BIOHAZARD/BCU not in project specification)
+        return sb.toString();
+    }
+
+    private static double score(double type, double distance, double workload, double severity) {
+        return (W_TYPE_MATCH * type)
+                + (W_DISTANCE * (1.0 / (1.0 + distance)))
+                + (W_WORKLOAD * (1.0 / (1.0 + workload)))
+                + (W_SEVERITY * (Math.max(1.0, Math.min(5.0, severity)) / 5.0));
+    }
+}
+
