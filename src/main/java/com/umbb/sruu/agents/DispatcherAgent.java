@@ -231,9 +231,9 @@ public class DispatcherAgent extends Agent {
                 return "FIRE";
             case "STRUCTURAL_COLLAPSE":
                 return "RESCUE";
-            case "BIOHAZARD":
-            case "CRYOGENIC_LEAK":
-                return "HAZMAT"; // CHANGED THIS TO MATCH THE DF!
+            // case "BIOHAZARD":
+            // case "CRYOGENIC_LEAK":
+            //     return "HAZMAT"; // REMOVED - not in project specification
             case "MEDICAL":
                 return "MEDICAL";
             default:

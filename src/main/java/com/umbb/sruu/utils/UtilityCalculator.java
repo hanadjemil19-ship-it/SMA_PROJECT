@@ -49,7 +49,7 @@ public class UtilityCalculator {
         if (emergencyType.equals("FIRE")) return unitId.contains("firetruck");
         if (emergencyType.equals("STRUCTURAL_COLLAPSE")) return unitId.contains("firetruck");
         if (emergencyType.equals("MEDICAL")) return unitId.contains("ambulance");
-        if (emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) return unitId.contains("bcu");
+        // if (emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) return unitId.contains("bcu");
 
         return false;
     }
@@ -61,7 +61,7 @@ public class UtilityCalculator {
         if (emergencyType.equals("MEDICAL") && normalizedUnitId.contains("ambulance")) return 1.0;
         if (emergencyType.equals("FIRE") && normalizedUnitId.contains("firetruck")) return 1.0;
         if (emergencyType.equals("STRUCTURAL_COLLAPSE") && normalizedUnitId.contains("firetruck")) return 1.0;
-        if ((emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) && normalizedUnitId.contains("bcu")) return 1.0;
+        // if ((emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) && normalizedUnitId.contains("bcu")) return 1.0;
 
         // Secondary responders can be useful, but must not beat primary responders for assignment.
         if (serviceType.equals("CROWD_CONTROL")
@@ -91,10 +91,7 @@ public class UtilityCalculator {
         double s1Amb = score(0.0, 2, 0, 4);
         sb.append(String.format(" -> firetruck=%.4f, ambulance=%.4f (type-match dominates distance)\n", s1Firetruck, s1Amb));
 
-        sb.append("S2 BIOHAZARD: bcu(d=10,w=1,s=5,type=1.0) vs ambulance(d=1,w=0,s=5,type=0.0)\n");
-        double s2Bcu = score(1.0, 10, 1, 5);
-        double s2Amb = score(0.0, 1, 0, 5);
-        sb.append(String.format(" -> bcu=%.4f, ambulance=%.4f (safety-critical specialization preserved)\n", s2Bcu, s2Amb));
+        // S2 removed (BIOHAZARD/BCU not in project specification)
         return sb.toString();
     }
 
