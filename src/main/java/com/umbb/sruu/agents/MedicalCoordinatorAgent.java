@@ -119,13 +119,15 @@ public class MedicalCoordinatorAgent extends Agent {
         try {
             System.out.println("[" + getLocalName() + "] Received hospital request from " + request.getSender().getLocalName());
 
-            String content = request.getContent();
-            if (content == null || !content.startsWith("HOSPITAL_REQUEST")) {
-                System.out.println("[" + getLocalName() + "] Ignoring non-hospital request: " + content);
+            jade.content.ContentElement ce = getContentManager().extractContent(request);
+            if (!(ce instanceof HospitalRequest)) {
+                System.out.println("[" + getLocalName() + "] Ignoring non-hospital request ontology object.");
                 return;
             }
+            HospitalRequest hr = (HospitalRequest) ce;
+            Location emergencyLoc = hr.getEmergencyLocation();
+            String eId = hr.getEmergencyId() != null ? hr.getEmergencyId() : "EMERGENCY-XXX";
 
-            Location emergencyLoc = parseEmergencyLocation(content);
             discoverHospitals();
             refreshHospitalCapacities();
             Hospital bestHospital = findClosestHospital(emergencyLoc);
@@ -133,12 +135,12 @@ public class MedicalCoordinatorAgent extends Agent {
             ACLMessage reply = request.createReply();
 
             if (bestHospital != null && bestHospital.getAvailableBeds() > 0) {
-                boolean admitted = requestHospitalAdmission(bestHospital, content);
+                boolean admitted = requestHospitalAdmission(bestHospital, eId);
                 if (!admitted) {
                     refreshHospitalCapacities();
                     bestHospital = findClosestHospital(emergencyLoc);
                     admitted = bestHospital != null && bestHospital.getAvailableBeds() > 0
-                            && requestHospitalAdmission(bestHospital, content);
+                            && requestHospitalAdmission(bestHospital, eId);
                 }
 
                 if (!admitted) {
@@ -155,7 +157,8 @@ public class MedicalCoordinatorAgent extends Agent {
 
                 HospitalAssignment assignment = new HospitalAssignment();
                 assignment.setHospital(bestHospital);
-                assignment.setEmergencyId("EMERGENCY-XXX");
+                assignment.setHospitalAid(hospitalAgents.get(bestHospital.getName()));
+                assignment.setEmergencyId(eId);
 
                 getContentManager().fillContent(reply, assignment);
 
@@ -216,19 +219,20 @@ public class MedicalCoordinatorAgent extends Agent {
 
     private void alertDispatcherSaturation() {
         ACLMessage alert = new ACLMessage(ACLMessage.INFORM);
-        alert.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) alert.addReceiver(dispatcher);
         alert.setContent("HOSPITAL_SATURATION_ALERT");
         send(alert);
     }
 
-    private boolean requestHospitalAdmission(Hospital hospital, String requestContent) {
+    private boolean requestHospitalAdmission(Hospital hospital, String emergencyId) {
         AID hospitalAid = hospitalAgents.get(hospital.getName());
         if (hospitalAid == null) return false;
         ACLMessage admission = new ACLMessage(ACLMessage.REQUEST);
         admission.addReceiver(hospitalAid);
         String convId = "ADMISSION-" + UUID.randomUUID();
         admission.setConversationId(convId);
-        admission.setContent("ADMISSION:" + requestContent);
+        admission.setContent("ADMISSION:" + emergencyId);
         send(admission);
 
         MessageTemplate mt = MessageTemplate.and(
@@ -278,6 +282,10 @@ public class MedicalCoordinatorAgent extends Agent {
                 }
             }
         }
+    }
+
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
 
     @Override

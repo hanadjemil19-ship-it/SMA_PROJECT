@@ -119,13 +119,13 @@ public class PoliceAgent extends Agent {
         dfd.addServices(sd1);
 
         ServiceDescription sd2 = new ServiceDescription();
-        sd2.setType("ACCESS");
+        sd2.setType("TRAFFIC_CONTROL");
         sd2.setName("police-access");
         dfd.addServices(sd2);
 
         try {
             DFService.register(this, dfd);
-            System.out.println("[" + getLocalName() + "] Registered in DF as CROWD_CONTROL and ACCESS");
+            System.out.println("[" + getLocalName() + "] Registered in DF as CROWD_CONTROL and TRAFFIC_CONTROL");
         } catch (FIPAException e) {
             e.printStackTrace();
         }
@@ -255,7 +255,8 @@ public class PoliceAgent extends Agent {
 
     private void notifyDispatcherIdle() {
         ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
-        idle.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) idle.addReceiver(dispatcher);
         idle.setContent("UNIT_IDLE:" + getLocalName());
         send(idle);
         System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
@@ -264,9 +265,14 @@ public class PoliceAgent extends Agent {
     private void sendLifecycleInform(String event, String emergencyId) {
         if (emergencyId == null) return;
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-        msg.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) msg.addReceiver(dispatcher);
         msg.setContent(event + ":" + getLocalName() + ":" + emergencyId);
         send(msg);
+    }
+
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
 
     @Override

@@ -1,12 +1,7 @@
 package com.umbb.sruu.agents;
 
 import com.umbb.sruu.behaviours.MovementBehaviour;
-import com.umbb.sruu.ontology.Emergency;
-import com.umbb.sruu.ontology.EmergencyOntology;
-import com.umbb.sruu.ontology.HasEmergency;
-import com.umbb.sruu.ontology.Location;
-import com.umbb.sruu.ontology.UnitAvailable;
-import com.umbb.sruu.ontology.UnitStatus;
+import com.umbb.sruu.ontology.*;
 import jade.content.lang.sl.SLCodec;
 import jade.core.AID;
 import jade.core.Agent;
@@ -25,21 +20,21 @@ import java.util.Map;
 public class BiohazardContainmentUnitAgent extends Agent {
 
     public enum State {
-        IDLE, EN_ROUTE, ON_SITE, DECONTAMINATING, RETURNING
+        IDLE, EN_ROUTE, ACTIVE, RETURNING, DECONTAMINATING
     }
-
-    private static final int SUIT_INTEGRITY_THRESHOLD = 25;
-    private static final int SUIT_DAMAGE_PER_INCIDENT = 20;
-    private static final int DECONTAMINATION_TIME_MS = 10000;
 
     private MovementBehaviour movement;
     private State state = State.IDLE;
     private int workload = 0;
-    private int suitIntegrity = 100;
 
     private Map<String, Emergency> pendingEmergencies = new HashMap<>();
-    private Emergency assignedEmergency;
-    private String currentMissionId;
+    private Emergency assignedEmergency = null;
+    private String currentMissionId = null;
+
+    private int suitIntegrity = 100;
+    private static final int SUIT_DEGRADATION_PER_MISSION = 30;
+    private static final int SUIT_THRESHOLD = 20;
+    private static final int DECONTAMINATION_TIME_MS = 6000;
 
     @Override
     protected void setup() {
@@ -48,7 +43,7 @@ public class BiohazardContainmentUnitAgent extends Agent {
         getContentManager().registerLanguage(new SLCodec());
         getContentManager().registerOntology(EmergencyOntology.getInstance());
 
-        movement = new MovementBehaviour(this, 200, new Location(35, 10), getLocalName());
+        movement = new MovementBehaviour(this, 150, new Location(80, 80), getLocalName());
         addBehaviour(movement);
 
         registerInDF();
@@ -69,7 +64,8 @@ public class BiohazardContainmentUnitAgent extends Agent {
         addBehaviour(new CyclicBehaviour(this) {
             @Override
             public void action() {
-                ACLMessage msg = receive(MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL));
+                MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL);
+                ACLMessage msg = receive(mt);
                 if (msg != null) handleAccept(msg);
                 else block();
             }
@@ -78,7 +74,8 @@ public class BiohazardContainmentUnitAgent extends Agent {
         addBehaviour(new CyclicBehaviour(this) {
             @Override
             public void action() {
-                ACLMessage msg = receive(MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL));
+                MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL);
+                ACLMessage msg = receive(mt);
                 if (msg != null) handleReject(msg);
                 else block();
             }
@@ -89,24 +86,14 @@ public class BiohazardContainmentUnitAgent extends Agent {
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
 
-        ServiceDescription biohazard = new ServiceDescription();
-        biohazard.setType("BIOHAZARD");
-        biohazard.setName("bcu-biohazard-" + getLocalName());
-        dfd.addServices(biohazard);
-
-        ServiceDescription cryogenic = new ServiceDescription();
-        cryogenic.setType("CRYOGENIC_LEAK");
-        cryogenic.setName("bcu-cryogenic-" + getLocalName());
-        dfd.addServices(cryogenic);
-
-        ServiceDescription medicalSupport = new ServiceDescription();
-        medicalSupport.setType("MEDICAL");
-        medicalSupport.setName("bcu-medical-support-" + getLocalName());
-        dfd.addServices(medicalSupport);
+        ServiceDescription sd1 = new ServiceDescription();
+        sd1.setType("HAZMAT");
+        sd1.setName("bcu-containment");
+        dfd.addServices(sd1);
 
         try {
             DFService.register(this, dfd);
-            System.out.println("[" + getLocalName() + "] Registered in DF as BIOHAZARD and CRYOGENIC_LEAK");
+            System.out.println("[" + getLocalName() + "] Registered in DF as HAZMAT");
         } catch (FIPAException e) {
             e.printStackTrace();
         }
@@ -118,24 +105,22 @@ public class BiohazardContainmentUnitAgent extends Agent {
             Emergency emergency = hasEmergency.getEmergency();
             String eId = cfp.getConversationId();
 
+            if (state == State.IDLE && workload == 0 && suitIntegrity > SUIT_THRESHOLD) {
+                pendingEmergencies.put(eId, emergency);
+            }
+
+            System.out.println("[" + getLocalName() + "] Received CFP for: " + emergency.getId());
+            System.out.println("[" + getLocalName() + "] Suit integrity: " + suitIntegrity + "%");
+
             ACLMessage reply = cfp.createReply();
 
-            if (!canHandle(emergency)) {
+            if (suitIntegrity <= SUIT_THRESHOLD) {
                 reply.setPerformative(ACLMessage.REFUSE);
-                reply.setContent("Unsupported incident type: " + emergency.getType());
-                send(reply);
-                return;
-            }
+                reply.setContent("COMPROMISED_SUIT");
+                System.out.println("[" + getLocalName() + "] Sending REFUSE - COMPROMISED SUIT! (" + suitIntegrity + "%)");
 
-            if (suitIntegrity <= SUIT_INTEGRITY_THRESHOLD) {
-                reply.setPerformative(ACLMessage.REFUSE);
-                reply.setContent("LOW_SUIT_INTEGRITY");
-                send(reply);
-                return;
-            }
-
-            if (state == State.IDLE && workload == 0) {
-                pendingEmergencies.put(eId, emergency);
+            } else if (state == State.IDLE && workload == 0) {
+                reply.setPerformative(ACLMessage.PROPOSE);
 
                 UnitStatus status = new UnitStatus();
                 status.setUnitId(getLocalName());
@@ -143,38 +128,44 @@ public class BiohazardContainmentUnitAgent extends Agent {
                 status.setCurrentLocation(movement.getCurrentLocation());
                 status.setWorkload(workload);
 
-                UnitAvailable available = new UnitAvailable();
-                available.setStatus(status);
+                UnitAvailable unitAvailable = new UnitAvailable();
+                unitAvailable.setStatus(status);
 
-                reply.setPerformative(ACLMessage.PROPOSE);
-                getContentManager().fillContent(reply, available);
-                System.out.println("[" + getLocalName() + "] Sending PROPOSE for " + eId);
+                getContentManager().fillContent(reply, unitAvailable);
+                System.out.println("[" + getLocalName() + "] Sending PROPOSE for " + emergency.getId());
+
             } else {
                 reply.setPerformative(ACLMessage.REFUSE);
-                reply.setContent("Busy: state=" + state + ", workload=" + workload);
+                reply.setContent("Busy: state=" + state);
+                System.out.println("[" + getLocalName() + "] Sending REFUSE (busy)");
             }
 
             send(reply);
+
         } catch (Exception e) {
-            System.err.println("[" + getLocalName() + "] Error handling CFP: " + e.getMessage());
+            System.err.println("[" + getLocalName() + "] Error: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private boolean canHandle(Emergency emergency) {
-        return emergency.getType().equals("BIOHAZARD")
-                || emergency.getType().equals("CRYOGENIC_LEAK")
-                || emergency.getType().equals("MEDICAL");
+    private void sendAbortToDispatcher(String emergencyId, String reason) {
+        ACLMessage abort = new ACLMessage(ACLMessage.INFORM);
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) abort.addReceiver(dispatcher);
+        String eId = (emergencyId != null && !emergencyId.isEmpty()) ? emergencyId : "UNKNOWN";
+        abort.setContent("UNIT_ABORT:" + getLocalName() + ":" + reason + ":" + eId);
+        send(abort);
+        System.out.println("[" + getLocalName() + "] Sent ABORT notification to dispatcher for " + eId);
     }
 
     private void handleAccept(ACLMessage accept) {
         String eId = accept.getConversationId();
-
         if (state != State.IDLE) {
-            ACLMessage failure = accept.createReply();
-            failure.setPerformative(ACLMessage.FAILURE);
-            failure.setContent("ALREADY_ASSIGNED");
-            send(failure);
+            System.err.println("[" + getLocalName() + "] REJECTING ACCEPT - already busy (state=" + state + ")");
+            ACLMessage reject = accept.createReply();
+            reject.setPerformative(ACLMessage.FAILURE);
+            reject.setContent("ALREADY_ASSIGNED");
+            send(reject);
             pendingEmergencies.clear();
             return;
         }
@@ -183,55 +174,72 @@ public class BiohazardContainmentUnitAgent extends Agent {
         pendingEmergencies.clear();
 
         if (assignedEmergency == null) {
-            System.err.println("[" + getLocalName() + "] No stored emergency for accepted assignment " + eId);
+            System.err.println("[" + getLocalName() + "] ERROR: No emergency stored for assignment! (eId=" + eId + ")");
             return;
         }
 
+        System.out.println("[" + getLocalName() + "] *** ASSIGNED to " + assignedEmergency.getId() + "! ***");
         currentMissionId = assignedEmergency.getId();
         transitionTo(State.EN_ROUTE);
         workload = 1;
 
-        Location target = assignedEmergency.getLocation();
-        System.out.println("[" + getLocalName() + "] Assigned to " + assignedEmergency.getId()
-                + ", moving to " + target);
+        final Location targetLocation = assignedEmergency.getLocation();
+        System.out.println("[" + getLocalName() + "] Target: " + targetLocation + " for " + assignedEmergency.getId());
 
-        movement.setTarget(target, () -> {
-            transitionTo(State.ON_SITE);
+        movement.setTarget(targetLocation, () -> {
+            transitionTo(State.ACTIVE);
             sendLifecycleInform("MISSION_ARRIVED", currentMissionId);
-            System.out.println("[" + getLocalName() + "] ON SITE handling " + assignedEmergency.getType()
-                    + " incident " + assignedEmergency.getId());
+            System.out.println("[" + getLocalName() + "] ACTIVE - containing hazard for " + assignedEmergency.getId());
+
+            suitIntegrity -= SUIT_DEGRADATION_PER_MISSION;
+            System.out.println("[" + getLocalName() + "] Suit degraded. Remaining integrity: " + suitIntegrity + "%");
+            
+            if (suitIntegrity <= SUIT_THRESHOLD && currentMissionId != null && state == State.ACTIVE) {
+                sendAbortToDispatcher(currentMissionId, "COMPROMISED_SUIT");
+                transitionTo(State.RETURNING);
+                workload = 0;
+                movement.setTarget(new Location(80, 80), () -> {
+                    startDecontamination();
+                });
+                return;
+            }
 
             addBehaviour(new WakerBehaviour(this, 5000) {
                 @Override
                 protected void onWake() {
-                    suitIntegrity -= SUIT_DAMAGE_PER_INCIDENT;
-                    transitionTo(State.DECONTAMINATING);
-                    System.out.println("[" + getLocalName() + "] Containment complete, decontaminating...");
-                    startDecontamination();
+                    sendLifecycleInform("MISSION_COMPLETE", currentMissionId);
+                    System.out.println("[" + getLocalName() + "] Hazard contained for " + assignedEmergency.getId() + ", returning to base");
+                    transitionTo(State.RETURNING);
+                    workload = 0;
+
+                    movement.setTarget(new Location(80, 80), () -> {
+                        if (suitIntegrity <= SUIT_THRESHOLD || assignedEmergency.getType().equals("BIOHAZARD")) {
+                            startDecontamination();
+                        } else {
+                            transitionTo(State.IDLE);
+                            assignedEmergency = null;
+                            currentMissionId = null;
+                            notifyDispatcherIdle();
+                            System.out.println("[" + getLocalName() + "] Back at base, suit integrity: " + suitIntegrity + "%, READY");
+                        }
+                    });
                 }
             });
         });
     }
 
     private void startDecontamination() {
+        transitionTo(State.DECONTAMINATING);
+        System.out.println("[" + getLocalName() + "] DECONTAMINATING AND REPLACING SUIT... (" + DECONTAMINATION_TIME_MS + "ms)");
         addBehaviour(new WakerBehaviour(this, DECONTAMINATION_TIME_MS) {
             @Override
             protected void onWake() {
-                transitionTo(State.RETURNING);
-                movement.setTarget(new Location(35, 10), () -> {
-                    sendLifecycleInform("MISSION_COMPLETE", currentMissionId);
-                    if (suitIntegrity <= SUIT_INTEGRITY_THRESHOLD) {
-                        suitIntegrity = 100;
-                        System.out.println("[" + getLocalName() + "] Protective suit replaced, integrity restored");
-                    }
-
-                    transitionTo(State.IDLE);
-                    workload = 0;
-                    assignedEmergency = null;
-                    currentMissionId = null;
-                    notifyDispatcherIdle();
-                    System.out.println("[" + getLocalName() + "] Back at base, READY");
-                });
+                suitIntegrity = 100;
+                transitionTo(State.IDLE);
+                assignedEmergency = null;
+                currentMissionId = null;
+                notifyDispatcherIdle();
+                System.out.println("[" + getLocalName() + "] Suit REPLACED to 100%, READY for next call");
             }
         });
     }
@@ -239,11 +247,14 @@ public class BiohazardContainmentUnitAgent extends Agent {
     private void handleReject(ACLMessage reject) {
         String eId = reject.getConversationId();
         pendingEmergencies.remove(eId);
-        System.out.println("[" + getLocalName() + "] Proposal rejected for " + eId + ": " + reject.getContent());
+        System.out.println("[" + getLocalName() + "] Proposal REJECTED for " + eId + ": " + reject.getContent());
 
         if (pendingEmergencies.isEmpty()) {
+            System.out.println("[" + getLocalName() + "] Remaining IDLE, ready for next call");
             transitionTo(State.IDLE);
             workload = 0;
+        } else {
+            System.out.println("[" + getLocalName() + "] Still have " + pendingEmergencies.size() + " pending proposal(s)");
         }
     }
 
@@ -256,24 +267,24 @@ public class BiohazardContainmentUnitAgent extends Agent {
 
     private void notifyDispatcherIdle() {
         ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
-        idle.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) idle.addReceiver(dispatcher);
         idle.setContent("UNIT_IDLE:" + getLocalName());
         send(idle);
+        System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
     }
 
     private void sendLifecycleInform(String event, String emergencyId) {
         if (emergencyId == null) return;
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-        msg.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) msg.addReceiver(dispatcher);
         msg.setContent(event + ":" + getLocalName() + ":" + emergencyId);
         send(msg);
     }
 
-    private void sendAbortToDispatcher(String emergencyId, String reason) {
-        ACLMessage abort = new ACLMessage(ACLMessage.INFORM);
-        abort.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
-        abort.setContent("UNIT_ABORT:" + getLocalName() + ":" + reason + ":" + emergencyId);
-        send(abort);
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
 
     @Override

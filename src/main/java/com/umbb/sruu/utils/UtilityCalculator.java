@@ -48,9 +48,8 @@ public class UtilityCalculator {
 
         if (emergencyType.equals("FIRE")) return unitId.contains("firetruck");
         if (emergencyType.equals("STRUCTURAL_COLLAPSE")) return unitId.contains("firetruck");
-        if (emergencyType.equals("MEDICAL")) return unitId.contains("ambulance") || unitId.contains("bcu");
-        if (emergencyType.equals("BIOHAZARD")) return unitId.contains("bcu") || unitId.contains("biohazard");
-        if (emergencyType.equals("CRYOGENIC_LEAK")) return unitId.contains("bcu") || unitId.contains("biohazard");
+        if (emergencyType.equals("MEDICAL")) return unitId.contains("ambulance");
+        if (emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) return unitId.contains("bcu");
 
         return false;
     }
@@ -62,12 +61,7 @@ public class UtilityCalculator {
         if (emergencyType.equals("MEDICAL") && normalizedUnitId.contains("ambulance")) return 1.0;
         if (emergencyType.equals("FIRE") && normalizedUnitId.contains("firetruck")) return 1.0;
         if (emergencyType.equals("STRUCTURAL_COLLAPSE") && normalizedUnitId.contains("firetruck")) return 1.0;
-        if (emergencyType.equals("BIOHAZARD")
-                && (normalizedUnitId.contains("bcu") || normalizedUnitId.contains("biohazard"))) return 1.0;
-        if (emergencyType.equals("CRYOGENIC_LEAK")
-                && (normalizedUnitId.contains("bcu") || normalizedUnitId.contains("biohazard"))) return 1.0;
-        if (emergencyType.equals("MEDICAL")
-                && (normalizedUnitId.contains("bcu") || normalizedUnitId.contains("biohazard"))) return 0.5;
+        if ((emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) && normalizedUnitId.contains("bcu")) return 1.0;
 
         // Secondary responders can be useful, but must not beat primary responders for assignment.
         if (serviceType.equals("CROWD_CONTROL")

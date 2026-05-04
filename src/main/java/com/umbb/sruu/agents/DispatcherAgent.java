@@ -63,7 +63,7 @@ public class DispatcherAgent extends Agent {
                         MessageTemplate.and(
                                 MessageTemplate.MatchOntology(EmergencyOntology.getInstance().getName()),
                                 MessageTemplate.not(MessageTemplate.MatchSender(
-                                        new AID("traffic-controller", AID.ISLOCALNAME)))
+                                        findAgentByService("TRAFFIC_CONTROL")))
                         )
                 );
                 ACLMessage msg = receive(mt);
@@ -141,7 +141,7 @@ public class DispatcherAgent extends Agent {
         DFAgentDescription dfd = new DFAgentDescription();
         dfd.setName(getAID());
         ServiceDescription sd = new ServiceDescription();
-        sd.setType("dispatcher");
+        sd.setType("COORDINATION");
         sd.setName("emergency-dispatcher");
         dfd.addServices(sd);
         try {
@@ -150,6 +150,10 @@ public class DispatcherAgent extends Agent {
         } catch (FIPAException e) {
             e.printStackTrace();
         }
+    }
+
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
 
     private void handleEmergencyAlert(ACLMessage msg) {
@@ -226,7 +230,8 @@ public class DispatcherAgent extends Agent {
 
     private void requestTrafficClearance(Emergency emergency) {
         ACLMessage request = new ACLMessage(ACLMessage.REQUEST);
-        request.addReceiver(new AID("traffic-controller", AID.ISLOCALNAME));
+        AID tc = findAgentByService("TRAFFIC_CONTROL");
+        if (tc != null) request.addReceiver(tc);
         request.setOntology(EmergencyOntology.getInstance().getName());
         request.setLanguage(new SLCodec().getName());
         Location emergencyLoc = emergency.getLocation();
@@ -695,7 +700,8 @@ public class DispatcherAgent extends Agent {
 
     private void notifyFailure(String eId, String reason) {
         ACLMessage failure = new ACLMessage(ACLMessage.FAILURE);
-        failure.addReceiver(new AID("logger", AID.ISLOCALNAME));
+        AID logger = findAgentByService("AUDIT");
+        if (logger != null) failure.addReceiver(logger);
         failure.setContent("INCIDENT_FAILED:" + eId + ":" + reason);
         send(failure);
     }
@@ -969,7 +975,8 @@ public class DispatcherAgent extends Agent {
 
     private void notifyLogger(String content) {
         ACLMessage log = new ACLMessage(ACLMessage.INFORM);
-        log.addReceiver(new AID("logger", AID.ISLOCALNAME));
+        AID logger = findAgentByService("AUDIT");
+        if (logger != null) log.addReceiver(logger);
         log.setContent(content);
         send(log);
     }

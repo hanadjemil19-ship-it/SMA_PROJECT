@@ -129,14 +129,20 @@ public class TrafficControllerAgent extends Agent {
         broadcast.setOntology(EmergencyOntology.getInstance().getName());
         broadcast.setLanguage(new SLCodec().getName());
 
-        String[] unitNames = {
-                "ambulance-1", "ambulance-2", "ambulance-3",
-                "firetruck-1", "firetruck-2", "firetruck-3",
-                "police-1", "police-2", "police-3",
-                "bcu-1"
-        };
-        for (String name : unitNames) {
-            broadcast.addReceiver(new AID(name, AID.ISLOCALNAME));
+        String[] targetServices = {"MEDICAL", "FIRE", "RESCUE", "CROWD_CONTROL", "TRAFFIC_CONTROL", "HAZMAT"};
+        for (String type : targetServices) {
+            DFAgentDescription template = new DFAgentDescription();
+            ServiceDescription sd = new ServiceDescription();
+            sd.setType(type);
+            template.addServices(sd);
+            try {
+                DFAgentDescription[] results = DFService.search(this, template);
+                for (DFAgentDescription result : results) {
+                    broadcast.addReceiver(result.getName());
+                }
+            } catch (FIPAException e) {
+                e.printStackTrace();
+            }
         }
 
         try {

@@ -1,4 +1,11 @@
-emergency_log_*.txt
+# Ignore emergency log text files
+emergency_log*.txt
+
+# Ignore IntelliJ IDEA folder
+.idea/
+
+# Ignore Maven build folder (good practice)
+target/
 target/
 !.mvn/wrapper/maven-wrapper.jar
 !**/src/main/**/target/

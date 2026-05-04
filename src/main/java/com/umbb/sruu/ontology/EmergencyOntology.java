@@ -10,7 +10,7 @@ public class EmergencyOntology extends Ontology {
     public static Ontology getInstance() { return instance; }
 
     private EmergencyOntology() {
-        super(ONTOLOGY_NAME, BasicOntology.getInstance());
+        super(ONTOLOGY_NAME, jade.domain.FIPAAgentManagement.FIPAManagementOntology.getInstance());
 
         try {
             // ========== FIRST: Register all basic schemas (no dependencies) ==========
@@ -68,7 +68,13 @@ public class EmergencyOntology extends Ontology {
             PredicateSchema hospitalAssignSchema = new PredicateSchema("HospitalAssignment");
             hospitalAssignSchema.add("hospital", (ConceptSchema) getSchema("Hospital"));
             hospitalAssignSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            hospitalAssignSchema.add("hospitalAid", (ConceptSchema) getSchema(jade.domain.FIPAAgentManagement.FIPAManagementOntology.AID), ObjectSchema.OPTIONAL);
             add(hospitalAssignSchema, HospitalAssignment.class);
+            // HospitalRequest predicate
+            PredicateSchema hospitalRequestSchema = new PredicateSchema("HospitalRequest");
+            hospitalRequestSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            hospitalRequestSchema.add("emergencyLocation", (ConceptSchema) getSchema("Location"));
+            add(hospitalRequestSchema, HospitalRequest.class);
         } catch (Exception e) {
             e.printStackTrace();
         }

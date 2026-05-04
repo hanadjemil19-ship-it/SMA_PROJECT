@@ -27,6 +27,7 @@ public class AmbulanceAgent extends Agent {
     private Map<String, Emergency> pendingEmergencies = new HashMap<>();
     private Emergency assignedEmergency = null;
     private Hospital assignedHospital = null;
+    private AID assignedHospitalAid = null;
     private String currentMissionId = null;
 
     @Override
@@ -185,27 +186,35 @@ public class AmbulanceAgent extends Agent {
     private void requestHospitalAssignment() {
         System.out.println("[" + getLocalName() + "] Requesting hospital from MedicalCoordinator...");
         ACLMessage request = new ACLMessage(ACLMessage.REQUEST);
-        request.addReceiver(new AID("medical-coordinator", AID.ISLOCALNAME));
+        AID mc = findAgentByService("MEDICAL_COORDINATION");
+        if (mc != null) request.addReceiver(mc);
         request.setOntology(EmergencyOntology.getInstance().getName());
         request.setLanguage(new SLCodec().getName());
-        request.setContent("HOSPITAL_REQUEST:" + assignedEmergency.getId() + ":" + assignedEmergency.getLocation().getX() + "," + assignedEmergency.getLocation().getY());
+        HospitalRequest hr = new HospitalRequest();
+        hr.setEmergencyId(assignedEmergency.getId());
+        hr.setEmergencyLocation(assignedEmergency.getLocation());
+        try {
+            getContentManager().fillContent(request, hr);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         send(request);
 
+        final AID mcTarget = findAgentByService("MEDICAL_COORDINATION");
+        
         addBehaviour(new CyclicBehaviour(this) {
             @Override
             public void action() {
-                MessageTemplate mt = MessageTemplate.and(
-                        MessageTemplate.MatchPerformative(ACLMessage.INFORM),
-                        MessageTemplate.and(
-                                MessageTemplate.MatchOntology(EmergencyOntology.getInstance().getName()),
-                                MessageTemplate.MatchSender(new AID("medical-coordinator", AID.ISLOCALNAME))
-                        )
-                );
+                MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.INFORM);
+                if (mcTarget != null) {
+                    mt = MessageTemplate.and(mt, MessageTemplate.MatchSender(mcTarget));
+                }
                 ACLMessage msg = receive(mt);
                 if (msg != null) {
                     try {
                         HospitalAssignment ha = (HospitalAssignment) getContentManager().extractContent(msg);
                         assignedHospital = ha.getHospital();
+                        assignedHospitalAid = ha.getHospitalAid();
                         System.out.println("[" + getLocalName() + "] Hospital assigned: " + assignedHospital.getName());
                         transitionTo(State.HOSPITAL_TRANSPORT);
                         System.out.println("[" + getLocalName() + "] Transporting patient to " + assignedHospital.getName());
@@ -219,10 +228,10 @@ public class AmbulanceAgent extends Agent {
                         removeBehaviour(this);
                     }
                 } else {
-                    MessageTemplate failMt = MessageTemplate.and(
-                            MessageTemplate.MatchPerformative(ACLMessage.FAILURE),
-                            MessageTemplate.MatchSender(new AID("medical-coordinator", AID.ISLOCALNAME))
-                    );
+                    MessageTemplate failMt = MessageTemplate.MatchPerformative(ACLMessage.FAILURE);
+                    if (mcTarget != null) {
+                        failMt = MessageTemplate.and(failMt, MessageTemplate.MatchSender(mcTarget));
+                    }
                     ACLMessage failMsg = receive(failMt);
                     if (failMsg != null) {
                         System.out.println("[" + getLocalName() + "] No hospital beds available! Returning to base.");
@@ -245,6 +254,7 @@ public class AmbulanceAgent extends Agent {
             workload = 0;
             assignedEmergency = null;
             assignedHospital = null;
+            assignedHospitalAid = null;
             currentMissionId = null;
             notifyDispatcherIdle();
             System.out.println("[" + getLocalName() + "] Back at base, READY for next call");
@@ -267,18 +277,28 @@ public class AmbulanceAgent extends Agent {
                 + ", starting patient handoff for " + currentMissionId);
 
         ACLMessage handoff = new ACLMessage(ACLMessage.REQUEST);
-        handoff.addReceiver(new AID(assignedHospital.getName(), AID.ISLOCALNAME));
+        if (assignedHospitalAid != null) {
+            handoff.addReceiver(assignedHospitalAid);
+        } else {
+            handoff.addReceiver(new AID(assignedHospital.getName(), AID.ISLOCALNAME));
+        }
         handoff.setConversationId(currentMissionId + ":HANDOFF");
-        handoff.setContent("PATIENT_HANDOFF:" + currentMissionId + ":" + getLocalName());
+        handoff.setOntology(EmergencyOntology.getInstance().getName());
+        handoff.setLanguage(new SLCodec().getName());
+        PatientHandoff ph = new PatientHandoff();
+        ph.setEmergencyId(currentMissionId);
+        ph.setAmbulanceId(getLocalName());
+        try {
+            getContentManager().fillContent(handoff, ph);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
         send(handoff);
 
         addBehaviour(new CyclicBehaviour(this) {
             @Override
             public void action() {
-                MessageTemplate mt = MessageTemplate.and(
-                        MessageTemplate.MatchConversationId(currentMissionId + ":HANDOFF"),
-                        MessageTemplate.MatchSender(new AID(assignedHospital.getName(), AID.ISLOCALNAME))
-                );
+                MessageTemplate mt = MessageTemplate.MatchConversationId(currentMissionId + ":HANDOFF");
                 ACLMessage msg = receive(mt);
                 if (msg == null) {
                     block();
@@ -309,7 +329,8 @@ public class AmbulanceAgent extends Agent {
 
     private void notifyDispatcherIdle() {
         ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
-        idle.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) idle.addReceiver(dispatcher);
         idle.setContent("UNIT_IDLE:" + getLocalName());
         send(idle);
         System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
@@ -318,9 +339,14 @@ public class AmbulanceAgent extends Agent {
     private void sendLifecycleInform(String event, String emergencyId) {
         if (emergencyId == null) return;
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-        msg.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) msg.addReceiver(dispatcher);
         msg.setContent(event + ":" + getLocalName() + ":" + emergencyId);
         send(msg);
+    }
+
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
 
     @Override

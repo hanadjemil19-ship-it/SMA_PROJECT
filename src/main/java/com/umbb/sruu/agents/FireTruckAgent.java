@@ -155,7 +155,8 @@ public class FireTruckAgent extends Agent {
 
     private void sendAbortToDispatcher(String emergencyId, String reason) {
         ACLMessage abort = new ACLMessage(ACLMessage.INFORM);
-        abort.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) abort.addReceiver(dispatcher);
         String eId = (emergencyId != null && !emergencyId.isEmpty()) ? emergencyId : "UNKNOWN";
         abort.setContent("UNIT_ABORT:" + getLocalName() + ":" + reason + ":" + eId);
         send(abort);
@@ -270,7 +271,8 @@ public class FireTruckAgent extends Agent {
 
     private void notifyDispatcherIdle() {
         ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
-        idle.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) idle.addReceiver(dispatcher);
         idle.setContent("UNIT_IDLE:" + getLocalName());
         send(idle);
         System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
@@ -279,9 +281,14 @@ public class FireTruckAgent extends Agent {
     private void sendLifecycleInform(String event, String emergencyId) {
         if (emergencyId == null) return;
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-        msg.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) msg.addReceiver(dispatcher);
         msg.setContent(event + ":" + getLocalName() + ":" + emergencyId);
         send(msg);
+    }
+
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
 
     @Override

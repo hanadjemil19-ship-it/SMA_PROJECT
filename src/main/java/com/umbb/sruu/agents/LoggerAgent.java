@@ -54,6 +54,8 @@ public class LoggerAgent extends Agent {
         getContentManager().registerLanguage(new SLCodec());
         getContentManager().registerOntology(EmergencyOntology.getInstance());
 
+        registerInDF();
+
         String filename = "emergency_log_" + System.currentTimeMillis() + ".txt";
         try {
             logWriter = new PrintWriter(new FileWriter(filename));
@@ -157,6 +159,21 @@ public class LoggerAgent extends Agent {
                 }
             }
         });
+    }
+
+    private void registerInDF() {
+        jade.domain.FIPAAgentManagement.DFAgentDescription dfd = new jade.domain.FIPAAgentManagement.DFAgentDescription();
+        dfd.setName(getAID());
+        jade.domain.FIPAAgentManagement.ServiceDescription sd = new jade.domain.FIPAAgentManagement.ServiceDescription();
+        sd.setType("AUDIT");
+        sd.setName("logger");
+        dfd.addServices(sd);
+        try {
+            jade.domain.DFService.register(this, dfd);
+            System.out.println("[" + getLocalName() + "] Registered in DF as AUDIT");
+        } catch (jade.domain.FIPAException e) {
+            e.printStackTrace();
+        }
     }
 
     private void logMessage(ACLMessage msg) {
@@ -431,6 +448,11 @@ public class LoggerAgent extends Agent {
     @Override
     protected void takeDown() {
         generateReport();
+        try {
+            jade.domain.DFService.deregister(this);
+        } catch (jade.domain.FIPAException e) {
+            e.printStackTrace();
+        }
         if (logWriter != null) {
             logWriter.close();
         }

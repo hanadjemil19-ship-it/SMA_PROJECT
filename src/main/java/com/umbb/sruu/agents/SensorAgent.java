@@ -98,7 +98,8 @@ public class SensorAgent extends Agent {
 
     private void sendEmergencyAlert(Emergency emergency) {
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-        msg.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) msg.addReceiver(dispatcher);
         msg.setLanguage(new SLCodec().getName());
         msg.setOntology(EmergencyOntology.getInstance().getName());
 
@@ -113,6 +114,10 @@ public class SensorAgent extends Agent {
             System.err.println("[" + getLocalName() + "] Error sending message: " + e.getMessage());
             e.printStackTrace();
         }
+    }
+
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
 
     @Override

@@ -19,6 +19,9 @@ public class HospitalAgent extends Agent {
 
     @Override
     protected void setup() {
+        getContentManager().registerLanguage(new jade.content.lang.sl.SLCodec());
+        getContentManager().registerOntology(com.umbb.sruu.ontology.EmergencyOntology.getInstance());
+        
         registerInDF();
 
         addBehaviour(new CyclicBehaviour(this) {
@@ -50,6 +53,16 @@ public class HospitalAgent extends Agent {
     }
 
     private void handleMessage(ACLMessage msg) {
+        try {
+            jade.content.ContentElement ce = getContentManager().extractContent(msg);
+            if (ce instanceof com.umbb.sruu.ontology.PatientHandoff) {
+                handlePatientHandoffOntology(msg, (com.umbb.sruu.ontology.PatientHandoff) ce);
+                return;
+            }
+        } catch (Exception e) {
+            // Fallback to string processing
+        }
+
         String content = msg.getContent();
         if (content == null) return;
 
@@ -79,6 +92,33 @@ public class HospitalAgent extends Agent {
             reply.setContent("BEDS:" + availableBeds + ":" + TOTAL_BEDS);
             send(reply);
         }
+    }
+
+    private void handlePatientHandoffOntology(ACLMessage msg, com.umbb.sruu.ontology.PatientHandoff ph) {
+        String emergencyId = ph.getEmergencyId() != null ? ph.getEmergencyId() : "UNKNOWN";
+        String ambulanceName = ph.getAmbulanceId() != null ? ph.getAmbulanceId() : msg.getSender().getLocalName();
+
+        ACLMessage reply = msg.createReply();
+        if (reservedAdmissions.remove(emergencyId)) {
+            reply.setPerformative(ACLMessage.INFORM);
+            reply.setContent("PATIENT_HANDOFF_COMPLETE:" + emergencyId + ":" + getLocalName() + ":" + availableBeds);
+            System.out.println("[" + getLocalName() + "] Handoff complete for " + emergencyId
+                    + " from " + ambulanceName + ", beds remaining=" + availableBeds);
+        } else if (availableBeds > 0) {
+            availableBeds--;
+            reply.setPerformative(ACLMessage.INFORM);
+            reply.setContent("PATIENT_HANDOFF_COMPLETE:" + emergencyId + ":" + getLocalName() + ":" + availableBeds);
+            System.out.println("[" + getLocalName() + "] Handoff complete without prior reservation for "
+                    + emergencyId + " from " + ambulanceName + ", beds remaining=" + availableBeds);
+            if (availableBeds < TOTAL_BEDS * 0.2) {
+                alertSaturation();
+            }
+        } else {
+            reply.setPerformative(ACLMessage.FAILURE);
+            reply.setContent("PATIENT_HANDOFF_REJECTED:" + emergencyId + ":NO_BEDS_AVAILABLE");
+            System.out.println("[" + getLocalName() + "] Handoff rejected for " + emergencyId + ": no beds available");
+        }
+        send(reply);
     }
 
     private void handlePatientHandoff(ACLMessage msg, String content) {
@@ -111,17 +151,26 @@ public class HospitalAgent extends Agent {
 
     private String parseEmergencyId(String content) {
         String[] parts = content.split(":");
-        return parts.length >= 3 ? parts[2] : null;
+        // Historically: ADMISSION:HOSPITAL_REQUEST:eId:loc
+        // Now: ADMISSION:eId
+        if (parts.length >= 3 && content.contains("HOSPITAL_REQUEST")) return parts[2];
+        return parts.length >= 2 ? parts[1] : null;
     }
 
     private void alertSaturation() {
         String percent = String.format("%.1f", (availableBeds * 100.0) / TOTAL_BEDS);
 
         ACLMessage alert = new ACLMessage(ACLMessage.INFORM);
-        alert.addReceiver(new AID("medical-coordinator", AID.ISLOCALNAME));
-        alert.addReceiver(new AID("dispatcher", AID.ISLOCALNAME));
+        AID mc = findAgentByService("MEDICAL_COORDINATION");
+        if (mc != null) alert.addReceiver(mc);
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) alert.addReceiver(dispatcher);
         alert.setContent("HOSPITAL_SATURATION:" + getLocalName() + ":" + availableBeds + ":" + TOTAL_BEDS + ":" + percent);
         send(alert);
+    }
+
+    private AID findAgentByService(String serviceType) {
+        return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
 
     @Override
