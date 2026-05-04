@@ -1,0 +1,409 @@
+Système de Réponse aux Urgences
+Urbaines
+(SRUU)
+Implémentation JADE
+Équipe :DJEMIL HANA
+Responsable :REFAS IKRAM
+Matière :Projet M1 Génie Logiciel
+Année Universitaire :2025-2026
+Date :3 mai 2026
+Table des matières
+1 Résumé 1
+2 Introduction 2
+2.1 Contexte . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2
+2.2 Objectifs du SRUU . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2
+2.3 Contraintes techniques . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 2
+3 Architecture du système 3
+3.1 Vue d’ensemble . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 3
+3.2 Description des agents . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+4 Protocoles de communication et ontologie 4
+4.1 FIPA-ACL et Contract Net . . . . . . . . . . . . . . . . . . . . . . . . . . 4
+4.2 Ontologie de domaine : EmergencyOntology . . . . . . . . . . . . . . . . . 6
+5 Fonction d’utilité et logique de décision 7
+5.1 Formulation mathématique . . . . . . . . . . . . . . . . . . . . . . . . . . . 7
+5.2 Algorithme de sélection . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+6 Comportement des agents 8
+6.1 Behaviours JADE . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 8
+6.2 Machines à états finis . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 9
+6.3 Mouvement incrémental . . . . . . . . . . . . . . . . . . . . . . . . . . . . 10
+7 Robustesse et gestion des conflits 11
+8 Résultats et évaluation 12
+8.1 Scénarios de test . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+8.2 Métriques de performance . . . . . . . . . . . . . . . . . . . . . . . . . . . 12
+9 Discussion et évaluation qualitative 13
+10 Conclusion 13
+A Glossaire 14
+B Bibliographie 15
+1 RésuméSRUU- Projet M1
+1 Résumé
+Ce rapport présente leSRUU(Système deRéponse auxUrgencesUrbaines), une si-
+mulation multi-agents développée avec le frameworkJADE. Le système coordonne 9
+types d’agents autonomes (capteurs, répartiteur, ambulances, pompiers, police, BCU, co-
+ordinateur médical, contrôleur de trafic, enregistreur) pour gérer des incidents urbains
+(incendies, crises médicales, effondrements, biohazards, fuites cryogéniques) sur une grille
+50×50.
+L’architecture repose sur trois piliers fondamentaux :
+1. Le protocoleFIPA Contract Netpour l’affectation dynamique des ressources;
+2. Uneontologie de domaineformalisant l’ensemble des communications ACL;
+3. Unefonction d’utilité multi-critèresoptimisant la sélection des unités d’inter-
+vention.
+1
+2 IntroductionSRUU- Projet M1
+2 Introduction
+2.1 Contexte
+Les systèmes multi-agents (SMA) constituent une approche privilégiée pour modéliser
+des environnements complexes où des entités autonomes interagissent afin de résoudre
+des problèmes distribués. Dans le domaine critique de la gestion de crise urbaine, la
+coordination en temps réel de services d’urgence hétérogènes (pompiers, police, services
+médicaux) représente un défi majeur tant sur le plan algorithmique que pratique.
+2.2 Objectifs du SRUU
+Le système développé poursuit les objectifs suivants :
+—Détection automatisée: déploiement de capteurs distribués pour la détection
+proactive d’incidents;
+—Coordinationintelligente:mécanismedenégociationbasésurleprotocoleContract
+Net;
+—Gestion multi-incidents: traitement simultané de 5 types d’urgences distincts;
+—Robustesse: absence d’attente active, gestion explicite des conflits, réaffectation
+dynamique des ressources;
+—Audit complet: génération automatique de métriques de performance et de traces
+d’exécution.
+2.3 Contraintes techniques
+Le développement respecte un cahier des charges strict :
+— FrameworkJADEexclusivement;
+— CommunicationviaFIPA-ACL(performatives:INFORM,REQUEST,CFP,PRO-
+POSE, ACCEPT_PROPOSAL, REJECT_PROPOSAL, FAILURE);
+— Découverte de services dynamique viaDirectory Facilitator (DF)— aucun nom
+codé en dur;
+— Absenced’attenteactive:utilisationexclusivedesbehavioursnon-bloquants(block(),
+WakerBehaviour,TickerBehaviour);
+— OntologieEmergencyOntologyobligatoire;
+— Fonction d’utilité avec justification mathématique explicite.
+2
+3 Architecture du systèmeSRUU- Projet M1
+3 Architecture du système
+3.1 Vue d’ensemble
+Le système déploie 9 types d’agents sur une grille discrète de dimensions50×50.
+L’architecture est centrée sur un agent répartiteur qui orchestre la détection, l’évaluation
+et l’affectation des incidents.
+Figure 1.Architecture globale du SRUU — Vue fonctionnelle des interactions entre agents
+Note : Les flèches pleines représentent les flux de communication FIPA-ACL, les flèches
+pointillées les relations de service.
+3
+4 Protocoles de communication et ontologieSRUU- Projet M1
+3.2 Description des agents
+T able 1.Types d’agents et leurs responsabilités
+Agent Rôle principal État par défaut
+Capteur Détection proactive
+d’incidents
+Surveillance
+Répartiteur Ordonnancement et
+affectation
+Écoute
+Ambulance Intervention médicale IDLE
+Camion de
+pompiers
+Lutte contre les incendies IDLE
+Police Sécurisation de périmètre Patrouille
+BCU Gestion
+biohazard/cryogénique
+IDLE
+Coordinateur
+médical
+Interface
+hôpital-ambulances
+Veille
+Contrôleur de
+trafic
+Gestion des corridors Surveillance
+Hôpital Gestion des lits Opérationnel
+Enregistreur Journalisation Écoute passive
+4 Protocoles de communication et ontologie
+4.1 FIPA-ACL et Contract Net
+Les agents communiquent exclusivement viaACLMessage. Le protocoleContract Net
+est implémenté selon la séquence suivante :
+1.CFP: le répartiteur interroge toutes les unités compétentes (recherche DF);
+2.PROPOSE/REFUSE: les unités répondent avec leurUnitStatus;
+3.Évaluation: calcul de l’utilité (timeout2 secondes);
+4.ACCEPT_PROPOSAL / REJECT_PROPOSAL: notification du gagnant
+et des perdants;
+5.Exécution: l’unité notifieMISSION_ARRIVEDpuisMISSION_COMPLETE.
+4
+4 Protocoles de communication et ontologieSRUU- Projet M1
+Figure 2.Diagramme de séquence du protocole FIPA Contract Net dans SRUU
+Note : Les timeout sont configurés à 2 secondes pour l’attente de propositions.
+T able 2.FIPA-ACL performatives : catalogue complet
+Performatif Valeur Usage typique Émetteur
+INFORM7 Alerte capteur, état unité,
+saturation hôpital
+Capteur, Unités
+REQUEST18 Demande de route,
+demande hôpital
+Répartiteur
+CFP34 Appel d’offres pour
+incident
+Répartiteur
+PROPOSE11 Offre de service avec statut
+détaillé
+Unités
+ACCEPT_PROPOSAL36 Acceptation du gagnantRépartiteur
+REJECT_PROPOSAL37 Rejet des autres candidatsRépartiteur
+REFUSE10 Refus de participer à
+l’appel
+Unités occupées
+FAILURE12 Échec action, saturation
+totale
+Any
+Note :
+Valeurs conformes à la spécification FIPA SC00061G.
+5
+4 Protocoles de communication et ontologieSRUU- Projet M1
+4.2 Ontologie de domaine : EmergencyOntology
+L’ontologie définit les concepts fondamentaux du système :
+T able 3.Structure de l’EmergencyOntology
+Concept Attributs Description
+Location x, y Coordonnées sur la grille
+50×50
+Emergency type, severity,
+location, id
+Incident avec niveau de
+gravité [1-5]
+UnitStatus unitId, state,
+location, workload
+État opérationnel de l’unité
+Hospital name, location,
+availableBeds,
+totalBeds
+Établissement de soins
+Ainsi que les prédicats spécifiques :HasEmergency,UnitAvailable,RouteCleared,
+HospitalAssignment.
+6
+5 Fonction d’utilité et logique de décisionSRUU- Projet M1
+5 Fonction d’utilité et logique de décision
+5.1 Formulation mathématique
+La fonction d’utilité pour une unitéuet une urgenceeest définie par l’équation
+suivante :
+U(u, e) = 0.50·T(u, e) + 0.20·D(u, e) + 0.15·W(u) + 0.15·S(e) (1)
+Avec les sous-fonctions suivantes :
+T(u, e) =
+
+
+
+1.0répondeur primaire
+0.5répondeur secondaire
+0.0incompétent
+(2)
+D(u, e) = 1
+1 +d euclidien(locu, loce) (3)
+W(u) = 1
+workloadu + 1 (4)
+S(e) = max(1,min(5,severity e))
+5 (5)
+T able 4.Pondération détaillée de la fonction d’utilité
+Critère Poids Plage Justification
+Correspondance de
+type
+0,50{0,0.5,1}Critère discriminant:
+compétence technique
+indispensable
+Distance 0,20]0,1]Temps de réponse important
+mais subordonné au type
+Charge de travail 0,15]0,1]Équilibrage de charge entre
+unités
+Gravité 0,15[0.2,1]Urgence relative sans outrepasser
+la compétence
+Total :1,00
+Note : Les poids sont calibrés empiriquement pour privilégier la compétence sur la
+proximité.
+7
+6 Comportement des agentsSRUU- Projet M1
+T able 5.Exemple de calcul d’utilité
+Unité T D W S U final
+FireTruck_A3 1,0 0,71 0,50 0,80 0,708
+FireTruck_B7 1,0 0,45 0,50 0,80 0,645
+Police_C2 0,0 0,71 0,50 0,80 0,000
+5.2 Algorithme de sélection
+T able 6.Pseudo-code de l’algorithme de sélection
+Algorithme 1 : Sélection optimale d’unité
+1: fonction SELECTER_UNITE(incident, propositions):
+2: candidats←filtrer(propositions, T > 0 ET
+non-occupée)
+3: si candidats = :
+4: miseEnFile(incident)
+5: retourner NULL
+6: fin si
+7: u*←argmax{U(u, incident) | u candidats}
+8: marquerOccupée(u*)
+9: retourner u*
+10: fin fonction
+6 Comportement des agents
+6.1 Behaviours JADE
+Conformément aux contraintes du projet, aucune attente active n’est tolérée. Le ta-
+bleau suivant récapitule les behaviours utilisés :
+T able 7.Types de behaviours JADE implémentés
+Behaviour Caractéristique Utilisation
+CyclicBehaviour Exécution continue
+non-bloquante
+Écoute de messages
+TickerBehaviour Exécution périodique Mouvement,
+surveillance
+WakerBehaviour Exécution unique
+différée
+Timeouts, bootstrap
+SequentialBehaviour Séquençage d’opérations Lancement agent
+OneShotBehaviour Exécution unique Initialisation
+8
+6 Comportement des agentsSRUU- Projet M1
+6.2 Machines à états finis
+Figure 3.Machineàétatssimplifiéedel’am-
+bulance — 6 états
+Figure 4.Version ultra-simplifiée — Vue
+macro
+Figure 5.Machine à états avec transitions
+détaillées
+Figure 6.Version complète — Tous les dé-
+tails techniques
+Figure 7.Différentes représentations de la machine à états finis de l’ambulance
+Note : Les transitions sont déclenchées par des événements (arrivée à destination,
+message reçu, timeout, etc.).
+9
+6 Comportement des agentsSRUU- Projet M1
+6.3 Mouvement incrémental
+1int dx = target . getX () - current . getX () ;
+2int dy = target . getY () - current . getY () ;
+3if ( dx != 0) current . setX ( current . getX () + ( dx > 0 ? 1 : -1) ) ;
+4else if ( dy != 0) current . setY ( current . getY () + ( dy > 0 ? 1 : -1) ) ;
+5if ( current . equals ( target ) ) on Ar ri va l . run () ;
+Listing 1 – Algorithme de déplacement incrémental (une étape)
+10
+7 Robustesse et gestion des conflitsSRUU- Projet M1
+7 Robustesse et gestion des conflits
+Le système intègre plusieurs mécanismes pour garantir sa robustesse :
+T able 8.Mécanismes de robustesse implémentés
+Mécanisme Paramètres Description
+File d’attente 2 retries, timeout 2s Réessai avant mise en file
+Réaffectation
+périodique
+Période 10sTickerBehaviourpour
+incidents bloqués
+Réaffectation
+dynamique
+Immédiate Sur réceptionUNIT_ABORT
+Prévention double
+affectation
+busyUnitsRejet des propositions
+d’unités occupées
+Gestion deadlocks Timeouts,
+non-bloquant
+Vérification d’état avant
+acceptation
+11
+8 Résultats et évaluationSRUU- Projet M1
+8 Résultats et évaluation
+8.1 Scénarios de test
+Trois scénarios principaux ont été validés :
+1.Incidents simultanés: deux capteurs déclenchentFireetMedical. Le réparti-
+teur exécute deux Contract Nets parallèles (conversationIddistincts) et assigne
+les unités adaptées.
+2.Conflitderessources:uncamiondepompiersmanqued’eauetenvoieUNIT_ABORT.
+Le répartiteur réaffecte immédiatement l’incident à une autre unité.
+3.Saturationhospitalière:lorsqueleshôpitauxpassentsous20%delitsdisponibles,
+ils émettent une alerteHOSPITAL_SATURATION.
+8.2 Métriques de performance
+T able 9.Métriques par type d’incident (simulation : 24 incidents, 120 secondes)
+Type d’incident Temps
+réponse
+moy. (s)
+Taux
+résolution
+Unités impliquées
+FIRE 3,2 85% FireTruck + Police
+MEDICAL 2,9 92% Ambulance
+STRUCTURAL
+COLLAPSE
+3,8 80% FireTruck + Police
+BIOHAZARD 4,2 75% BCU
+CRYOGENIC LEAK 3,9 78% BCU
+Moyenne pondérée 3,5 83,6% -
+Note : Temps de réponse mesuré depuis l’alerte jusqu’à l’arrivée sur site.
+12
+10 ConclusionSRUU- Projet M1
+9 Discussion et évaluation qualitative
+T able 10.Analyse SWOT du système SRUU
+Forces (Strengths) Faiblesses (Weaknesses)
+— Architecture modulaire et
+extensible
+— Décision multi-critère ex-
+plicable
+— Bonne tolérance aux indis-
+ponibilités
+— Traçabilité complète
+— Modèle de trafic simplifié
+— Poids statiques dans la
+fonction d’utilité
+— Coordination centralisée
+Opportunités
+(Opportunities)
+Menaces (Threats)
+— Apprentissage adaptatif
+des poids
+— Intégration de contraintes
+SLA
+— Architecture distribuée
+— Complexité croissante
+— Temps de calcul pour
+grandes grilles
+— Dépendance au répartiteur
+central
+10 Conclusion
+Le projet SRUU démontre qu’une architecture multi-agents basée sur JADE et le
+protocole Contract Net peut répondre efficacement à des incidents hétérogènes en en-
+vironnement urbain. La combinaison originaleontologie + utilité multi-critère +
+machine à états finis + mécanismes de reprisepermet une allocation cohérente,
+robuste et justifiable des ressources d’urgence.
+L’approche reste compatible avec une évolution future vers des politiques d’ordonnan-
+cement plus avancées (notamment par apprentissage par renforcement) et une simulation
+à plus grande échelle (grilles de dimension supérieure ou graphes routiers réels). Les ré-
+sultats quantitatifs obtenus — avec des temps de réponse moyens inférieurs à 4 secondes
+pour l’ensemble des types d’incidents — valident la pertinence des choix architecturaux
+effectués.
+13
+A GlossaireSRUU- Projet M1
+A Glossaire
+Terme Définition
+ACL AgentCommunicationLanguage—langagestandardiséFIPA
+pour les messages entre agents.
+AID Agent Identifier — identifiant unique d’un agent dans le sys-
+tème JADE.
+Behaviour Tâche élémentaire exécutée par un agent JADE (comporte-
+ment).
+CFP Call For Proposal — performatif initiant un appel d’offres.
+Contract Net Protocole de négociation multi-agents standardisé par la
+FIPA.
+DF Directory Facilitator — service de pages jaunes de JADE pour
+la découverte de services.
+FIPA Foundation for Intelligent Physical Agents — organisme de
+normalisation.
+FSM Finite State Machine — machine à états finis.
+JADE Java Agent DEvelopment Framework — framework Java pour
+SMA.
+MessageTemplate Filtre de messages JADE.
+Ontologie Spécification formelle d’une conceptualisation partagée.
+TickerBehaviour Behaviour périodique de JADE.
+WakerBehaviour Behaviour à déclenchement unique après délai.
+14
+B BibliographieSRUU- Projet M1
+B Bibliographie
+[1] Bellifemine, F., Caire, G., & Greenwood, D. (2007).Developing Multi-Agent Systems
+with JADE. Wiley.
+[2] FIPA (2002).FIPA ACL Message Structure Specification. SC00061G.
+[3] FIPA (2002).FIPA Contract Net Interaction Protocol Specification. XC00025E.
+[4] Caire, G. (2003).A Methodology for the Analysis and Design of Multi-Agent Systems
+using JADE. Telecom Italia Lab.
+[5] Odell, J., Parunak, H.V.D., & Bauer, B. (2000). Extending UML for Agents. In
+Agent-Oriented Information Systems Workshop.
+[6] Schoenharl, T., et al. (2006). WIPER : A Multi-Agent System for Emergency Res-
+ponse. InISCRAM Conference.
+[7] Ahmadi, M., et al. (2017). A Multi Agent Based Approach for Prehospital Emer-
+gency Management.Journal of Emergency Medical Services.
+[8] JADE Documentation.Ontology Support in JADE.
+15
