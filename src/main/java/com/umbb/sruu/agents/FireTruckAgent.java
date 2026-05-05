@@ -176,6 +176,17 @@ public class FireTruckAgent extends Agent {
         System.out.println("[" + getLocalName() + "] Sent ABORT notification to dispatcher for " + eId);
     }
 
+    // NEW: ABORT format required for dispatcher-only reassignment
+    private void sendAbortToDispatcherWaterEmpty(String emergencyId) {
+        ACLMessage abort = new ACLMessage(ACLMessage.INFORM);
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) abort.addReceiver(dispatcher);
+        String eId = (emergencyId != null && !emergencyId.isEmpty()) ? emergencyId : "UNKNOWN";
+        abort.setContent("ABORT:" + getLocalName() + ":WATER_EMPTY:" + eId);
+        send(abort);
+        System.out.println("[" + getLocalName() + "] Sent ABORT (WATER_EMPTY) to dispatcher for " + eId);
+    }
+
     private void handleAccept(ACLMessage accept) {
         String eId = accept.getConversationId();
         stateLock.lock();
@@ -216,20 +227,21 @@ public class FireTruckAgent extends Agent {
 
             stateLock.lock();
             try {
-                waterLevel -= WATER_PER_FIRE;
+                waterLevel = Math.max(0, waterLevel - WATER_PER_FIRE); // MODIFIED: clamp to 0
             } finally {
                 stateLock.unlock();
             }
             System.out.println("[" + getLocalName() + "] Water consumed. Remaining: " + waterLevel + "%");
-            boolean shouldAbortLowWater;
+            boolean shouldAbortEmptyWater; // MODIFIED
             stateLock.lock();
             try {
-                shouldAbortLowWater = waterLevel <= WATER_THRESHOLD && currentMissionId != null && state == State.ACTIVE;
+                // MODIFIED: ABORT only when water reaches 0 (project requirement)
+                shouldAbortEmptyWater = waterLevel <= 0 && currentMissionId != null && state == State.ACTIVE;
             } finally {
                 stateLock.unlock();
             }
-            if (shouldAbortLowWater) {
-                sendAbortToDispatcher(currentMissionId, "LOW_WATER");
+            if (shouldAbortEmptyWater) {
+                sendAbortToDispatcherWaterEmpty(currentMissionId); // NEW
                 transitionTo(State.RETURNING);
                 workload = 0;
                 movement.setTarget(new Location(20, 20), () -> {

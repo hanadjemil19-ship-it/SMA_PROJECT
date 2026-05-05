@@ -182,37 +182,52 @@ public class DispatcherAgent extends Agent {
                 return;
             }
 
-            HasEmergency hasEmergency = (HasEmergency) getContentManager().extractContent(msg);
-            Emergency emergency = hasEmergency.getEmergency();
+            // FIX: Multiple ontology predicates exist; type-check before casting
+            jade.content.ContentElement ce = getContentManager().extractContent(msg); // FIX
+            if (ce instanceof HasEmergency hasEmergency) { // FIX
+                Emergency emergency = hasEmergency.getEmergency();
 
-            System.out.println("[" + getLocalName() + "] *** NEW EMERGENCY: " + emergency);
-            System.out.println("[" + getLocalName() + "] From: " + msg.getSender().getLocalName());
+                System.out.println("[" + getLocalName() + "] *** NEW EMERGENCY: " + emergency);
+                System.out.println("[" + getLocalName() + "] From: " + msg.getSender().getLocalName());
 
-            String eId = emergency.getId();
-            appendIncidentEvent(eId, new IncidentEvent.Detected(System.currentTimeMillis(), emergency.getType()));
-            incidentStatus.putIfAbsent(eId, IncidentStatus.PENDING);
-            notifyLogger("DETECTED:" + eId + ":" + emergency.getType());
-            if (failedIncidents.contains(eId)) {
-                System.out.println("[" + getLocalName() + "] Ignoring emergency " + eId + " because it is already marked FAILED");
-                return;
+                String eId = emergency.getId();
+                appendIncidentEvent(eId, new IncidentEvent.Detected(System.currentTimeMillis(), emergency.getType()));
+                incidentStatus.putIfAbsent(eId, IncidentStatus.PENDING);
+                notifyLogger("DETECTED:" + eId + ":" + emergency.getType());
+                if (failedIncidents.contains(eId)) {
+                    System.out.println("[" + getLocalName() + "] Ignoring emergency " + eId + " because it is already marked FAILED");
+                    return;
+                }
+                if (assignedUnits.containsKey(eId) || activeCollectors.containsKey(eId) || queuedIncidentIds.contains(eId)) {
+                    System.out.println("[" + getLocalName() + "] Ignoring duplicate emergency alert for " + eId);
+                    return;
+                }
+
+                emergencyData.put(eId, emergency);
+
+                String serviceType = determineServiceType(emergency);
+                emergencyServiceType.put(eId, serviceType);
+
+                ProposalCollector collector = new ProposalCollector(eId, serviceType, emergency);
+                activeCollectors.put(eId, collector);
+
+                requestTrafficClearance(emergency);
+                searchAndSendCFP(serviceType, emergency, eId);
+                // Invariant: perimeter assignment must be conditional on successful primary assignment.
+                // Police CNP is started only after a primary unit is assigned (see evaluateAndAssign()).
+                return; // FIX
             }
-            if (assignedUnits.containsKey(eId) || activeCollectors.containsKey(eId) || queuedIncidentIds.contains(eId)) {
-                System.out.println("[" + getLocalName() + "] Ignoring duplicate emergency alert for " + eId);
-                return;
+
+            if (ce instanceof RouteCleared routeCleared) { // FIX
+                System.out.println("[" + getLocalName() + "] RouteCleared received: from="
+                        + routeCleared.getFrom() + " to=" + routeCleared.getTo()
+                        + " exp=" + routeCleared.getExpirationSeconds() + "s");
+                notifyLogger("ROUTE_CLEARED:" + routeCleared.getFrom() + ":" + routeCleared.getTo()); // FIX (safe log)
+                return; // FIX
             }
 
-            emergencyData.put(eId, emergency);
-
-            String serviceType = determineServiceType(emergency);
-            emergencyServiceType.put(eId, serviceType);
-
-            ProposalCollector collector = new ProposalCollector(eId, serviceType, emergency);
-            activeCollectors.put(eId, collector);
-
-            requestTrafficClearance(emergency);
-            searchAndSendCFP(serviceType, emergency, eId);
-            // Invariant: perimeter assignment must be conditional on successful primary assignment.
-            // Police CNP is started only after a primary unit is assigned (see evaluateAndAssign()).
+            System.out.println("[" + getLocalName() + "] Unknown ontology content received: "
+                    + (ce != null ? ce.getClass().getSimpleName() : "null") + " (ignored)"); // FIX
 
         } catch (Exception e) {
             System.err.println("[" + getLocalName() + "] Error: " + e.getMessage());
@@ -231,9 +246,9 @@ public class DispatcherAgent extends Agent {
                 return "FIRE";
             case "STRUCTURAL_COLLAPSE":
                 return "RESCUE";
-            // case "BIOHAZARD":
-            // case "CRYOGENIC_LEAK":
-            //     return "HAZMAT"; // REMOVED - not in project specification
+            case "BIOHAZARD": // NEW
+            case "CRYOGENIC_LEAK": // NEW
+                return "BIOHAZARD_CONTAINMENT"; // NEW (DF capability required by spec)
             case "MEDICAL":
                 return "MEDICAL";
             default:
@@ -968,19 +983,26 @@ public class DispatcherAgent extends Agent {
         String content = abort.getContent();
         System.out.println("[" + getLocalName() + "] RECEIVED ABORT: " + content);
 
-        // FIX: Handle both UNIT_ABORT:unit:reason:eid and ABORT:reason:eid formats
+        // MODIFIED: Handle UNIT_ABORT:unit:reason:eid, ABORT:reason:eid, and ABORT:unit:reason:eid
         String[] parts = content.split(":");
         String unitName = null;
         String reason = null;
         String emergencyId = null;
+        boolean shouldReassign = false; // NEW: only reassign on ABORT
 
         if (content.startsWith("UNIT_ABORT:") && parts.length >= 4) {
             unitName = parts[1];
             reason = parts[2];
             emergencyId = parts[3];
+        } else if (content.startsWith("ABORT:") && parts.length >= 4) { // NEW
+            unitName = parts[1];
+            reason = parts[2];
+            emergencyId = parts[3];
+            shouldReassign = true; // NEW
         } else if (content.startsWith("ABORT:") && parts.length >= 3) {
             reason = parts[1];
             emergencyId = parts[2];
+            shouldReassign = true; // NEW (legacy ABORT format)
         }
 
         if (unitName != null) {
@@ -1017,7 +1039,7 @@ public class DispatcherAgent extends Agent {
                 releasePolicePerimeter(abortedEmergencyId);
             }
             notifyLogger("ABORTED:" + abortedEmergencyId + ":" + unitName + ":" + reason);
-            if (emergency != null) {
+            if (shouldReassign && emergency != null) { // NEW: reassign ONLY on ABORT
                 scheduleImmediateRetry(abortedEmergencyId, emergency, "assigned unit aborted: " + reason);
             }
         }

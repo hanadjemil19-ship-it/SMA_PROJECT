@@ -6,6 +6,7 @@ import jade.content.lang.sl.SLCodec;
 import jade.core.AID;
 import jade.core.Agent;
 import jade.core.behaviours.CyclicBehaviour;
+import jade.core.behaviours.TickerBehaviour; // FIX
 import jade.core.behaviours.WakerBehaviour;
 import jade.domain.DFService;
 import jade.domain.FIPAAgentManagement.DFAgentDescription;
@@ -120,7 +121,13 @@ public class BiohazardContainmentUnitAgent extends Agent {
             Emergency emergency = hasEmergency.getEmergency();
             String eId = cfp.getConversationId();
 
-            if (state == State.IDLE && workload == 0 && canAcceptWithCurrentSuit(emergency)) {
+            // MODIFIED: only handle BIOHAZARD / CRYOGENIC_LEAK (project requirement)
+            boolean supportedType = emergency != null
+                    && emergency.getType() != null
+                    && ("BIOHAZARD".equalsIgnoreCase(emergency.getType())
+                    || "CRYOGENIC_LEAK".equalsIgnoreCase(emergency.getType())); // NEW
+
+            if (state == State.IDLE && workload == 0 && supportedType && canAcceptWithCurrentSuit(emergency)) { // MODIFIED
                 pendingEmergencies.put(eId, emergency);
             }
 
@@ -129,7 +136,13 @@ public class BiohazardContainmentUnitAgent extends Agent {
 
             ACLMessage reply = cfp.createReply();
 
-            if (!canAcceptWithCurrentSuit(emergency)) {
+            if (!supportedType) { // NEW
+                reply.setPerformative(ACLMessage.REFUSE);
+                reply.setContent("UNSUPPORTED_TYPE");
+                System.out.println("[" + getLocalName() + "] Sending REFUSE - UNSUPPORTED TYPE ("
+                        + (emergency != null ? emergency.getType() : "null") + ")");
+
+            } else if (!canAcceptWithCurrentSuit(emergency)) {
                 reply.setPerformative(ACLMessage.REFUSE);
                 reply.setContent("COMPROMISED_SUIT");
                 System.out.println("[" + getLocalName() + "] Sending REFUSE - COMPROMISED SUIT! ("
@@ -204,6 +217,9 @@ public class BiohazardContainmentUnitAgent extends Agent {
 
         movement.setTarget(targetLocation, () -> {
             transitionTo(State.ACTIVE);
+            // FIX: explicit arrival log + lifecycle notify (same pattern as other units)
+            Location arrived = movement.getCurrentLocation();
+            System.out.println("[" + getLocalName() + "] ARRIVED at (" + arrived.getX() + "," + arrived.getY() + ")"); // FIX
             sendLifecycleInform("MISSION_ARRIVED", currentMissionId);
             System.out.println("[" + getLocalName() + "] ACTIVE - containing hazard for " + assignedEmergency.getId());
 
@@ -223,10 +239,18 @@ public class BiohazardContainmentUnitAgent extends Agent {
                 return;
             }
 
-            addBehaviour(new WakerBehaviour(this, 5000) {
+            // FIX: short processing phase (2–3 ticks), then MISSION_COMPLETE
+            addBehaviour(new TickerBehaviour(this, 1000) { // FIX
+                private int ticks = 0; // FIX
+
                 @Override
-                protected void onWake() {
-                    sendLifecycleInform("MISSION_COMPLETE", currentMissionId);
+                protected void onTick() {
+                    ticks++;
+                    System.out.println("[" + getLocalName() + "] CONTAINING BIOHAZARD..."); // FIX
+                    if (ticks < 3) return; // FIX
+                    stop(); // FIX
+
+                    sendLifecycleInform("MISSION_COMPLETE", currentMissionId); // FIX
                     System.out.println("[" + getLocalName() + "] Hazard contained for " + assignedEmergency.getId() + ", returning to base");
                     transitionTo(State.RETURNING);
                     workload = 0;

@@ -49,7 +49,8 @@ public class UtilityCalculator {
         if (emergencyType.equals("FIRE")) return unitId.contains("firetruck");
         if (emergencyType.equals("STRUCTURAL_COLLAPSE")) return unitId.contains("firetruck");
         if (emergencyType.equals("MEDICAL")) return unitId.contains("ambulance");
-        // if (emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) return unitId.contains("bcu");
+        // FIX: BIOHAZARD/CRYOGENIC_LEAK must accept BCU as valid primary responder
+        if (emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) return unitId.contains("bcu"); // FIX
 
         return false;
     }

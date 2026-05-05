@@ -32,10 +32,10 @@ public class BootstrapAgent extends Agent {
         for (int i = 1; i <= 3; i++) {
             addLaunchStep(startupSequence, "firetruck-" + i, "com.umbb.sruu.agents.FireTruckAgent");
         }
-        // BCU agents removed - not in project specification
-        // for (int i = 1; i <= 3; i++) {
-        //     addLaunchStep(startupSequence, "bcu-" + i, "com.umbb.sruu.agents.BiohazardContainmentUnitAgent");
-        // }
+        // MODIFIED: add BCU agents (project requirement)
+        for (int i = 1; i <= 3; i++) { // NEW
+            addLaunchStep(startupSequence, "bcu-" + i, "com.umbb.sruu.agents.BiohazardContainmentUnitAgent"); // NEW
+        }
 
         addLaunchStep(startupSequence, "hospital-1", "com.umbb.sruu.agents.HospitalAgent");
         addLaunchStep(startupSequence, "hospital-2", "com.umbb.sruu.agents.HospitalAgent");
