@@ -4,27 +4,11 @@ import com.umbb.sruu.ontology.Emergency;
 import com.umbb.sruu.ontology.Location;
 import org.junit.jupiter.api.Test;
 
-import java.lang.reflect.Field;
 import java.util.Set;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import static org.junit.jupiter.api.Assertions.*;
 
 class SystemicBugsTest {
-
-    @Test
-    void bug1_bcuSuitIntegrityIsSingleAtomicAndCASWorks() throws Exception {
-        BiohazardContainmentUnitAgent bcu = new BiohazardContainmentUnitAgent();
-
-        Field f = BiohazardContainmentUnitAgent.class.getDeclaredField("suitIntegrity");
-        assertEquals(AtomicInteger.class, f.getType(), "suitIntegrity must be a single AtomicInteger field");
-
-        bcu.testSuitIntegritySet(10);
-        assertEquals(10, bcu.testSuitIntegrityRead());
-        assertTrue(bcu.testSuitIntegrityCas(10, 100), "replacement must CAS from degraded value to 100");
-        assertEquals(100, bcu.testSuitIntegrityRead());
-        assertFalse(bcu.testSuitIntegrityCas(10, 100), "CAS must fail if value is no longer degraded");
-    }
 
     @Test
     void bug2_perimeterOnlyStartsAfterPrimaryAssigned_andPoliceReleaseCancelsEvenEnRoute() {

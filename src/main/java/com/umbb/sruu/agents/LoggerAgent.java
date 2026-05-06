@@ -1,11 +1,11 @@
 package com.umbb.sruu.agents;
 
-import com.umbb.sruu.ontology.EmergencyOntology;
+import com.umbb.sruu.ontology.*;
 import jade.content.lang.sl.SLCodec;
 import jade.core.Agent;
 import jade.core.behaviours.CyclicBehaviour;
 import jade.lang.acl.ACLMessage;
-import jade.lang.acl.MessageTemplate;
+
 
 import java.io.FileWriter;
 import java.io.IOException;
@@ -15,37 +15,26 @@ import java.nio.file.Path;
 import java.nio.file.Paths;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
-import java.util.ArrayList;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.List;
-import java.util.Map;
-import java.util.Set;
+import java.util.*;
 
 public class LoggerAgent extends Agent {
 
     private PrintWriter logWriter;
-    private int incidentCount = 0;
-    private int resolvedCount = 0;
-    private int refusedCount = 0;
-    private int assignedCount = 0;
-    private int unresolvedCount = 0;
-    private int abortedCount = 0;
-    private int failedCount = 0;
     private long totalResponseTime = 0;
     private long startTime = System.currentTimeMillis();
     private DateTimeFormatter formatter = DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss");
 
-    // Track emergency lifecycle
     private Map<String, Long> emergencyStartTimes = new HashMap<>();
-    private Map<String, Long> arrivalTimes = new HashMap<>();
     private Map<String, String> incidentTypes = new HashMap<>();
     private Map<String, List<Long>> responseTimesByType = new HashMap<>();
+    
     private Set<String> detectedIncidents = new HashSet<>();
     private Set<String> resolvedIncidents = new HashSet<>();
-    private Set<String> assignedIncidents = new HashSet<>();
-    private Set<String> abortedIncidents = new HashSet<>();
     private Set<String> failedIncidents = new HashSet<>();
+    
+    private int assignedUnitsCount = 0; // Count of primary units assigned
+    private int missionAbortsCount = 0; // Count of MissionAbort received
+    private int resolvedCount = 0; // Count of MissionComplete received with success=true
 
     @Override
     protected void setup() {
@@ -70,90 +59,12 @@ public class LoggerAgent extends Agent {
             System.err.println("[" + getLocalName() + "] ERROR opening log file: " + e.getMessage());
         }
 
-        // FIX: Listen for specific message types instead of all messages
-        // Behaviour 1: Detect new incidents from sensors
-        addBehaviour(new CyclicBehaviour(this) {
-            @Override
-            public void action() {
-                MessageTemplate mt = MessageTemplate.and(
-                        MessageTemplate.MatchPerformative(ACLMessage.INFORM),
-                        MessageTemplate.and(
-                                MessageTemplate.MatchOntology(EmergencyOntology.getInstance().getName()),
-                                MessageTemplate.not(MessageTemplate.MatchSender(new jade.core.AID("traffic-controller", jade.core.AID.ISLOCALNAME)))
-                        )
-                );
-                ACLMessage msg = receive(mt);
-                if (msg != null) {
-                    logMessage(msg);
-                    trackNewIncident(msg);
-                } else {
-                    block();
-                }
-            }
-        });
-
-        // Behaviour 2: Track ACCEPT_PROPOSAL (assignments)
-        addBehaviour(new CyclicBehaviour(this) {
-            @Override
-            public void action() {
-                MessageTemplate mt = MessageTemplate.MatchPerformative(ACLMessage.ACCEPT_PROPOSAL);
-                ACLMessage msg = receive(mt);
-                if (msg != null) {
-                    logMessage(msg);
-                    trackAssignment(msg);
-                } else {
-                    block();
-                }
-            }
-        });
-
-        // Behaviour 3: Track REJECT_PROPOSAL and REFUSE
-        addBehaviour(new CyclicBehaviour(this) {
-            @Override
-            public void action() {
-                MessageTemplate mt = MessageTemplate.or(
-                        MessageTemplate.MatchPerformative(ACLMessage.REJECT_PROPOSAL),
-                        MessageTemplate.MatchPerformative(ACLMessage.REFUSE)
-                );
-                ACLMessage msg = receive(mt);
-                if (msg != null) {
-                    logMessage(msg);
-                    trackRefusal(msg);
-                } else {
-                    block();
-                }
-            }
-        });
-
-        // Behaviour 4: Track ABORT and FAILURE messages
-        addBehaviour(new CyclicBehaviour(this) {
-            @Override
-            public void action() {
-                MessageTemplate mt = MessageTemplate.or(
-                        MessageTemplate.MatchPerformative(ACLMessage.FAILURE),
-                        MessageTemplate.and(
-                                MessageTemplate.MatchPerformative(ACLMessage.INFORM),
-                                MessageTemplate.MatchContent("UNIT_ABORT:*")
-                        )
-                );
-                ACLMessage msg = receive(mt);
-                if (msg != null) {
-                    logMessage(msg);
-                    trackAbortOrFailure(msg);
-                } else {
-                    block();
-                }
-            }
-        });
-
-        // Behaviour 5: Log everything else (low priority)
         addBehaviour(new CyclicBehaviour(this) {
             @Override
             public void action() {
                 ACLMessage msg = receive();
                 if (msg != null) {
-                    logMessage(msg);
-                    trackLifecycle(msg);
+                    processMessage(msg);
                 } else {
                     block();
                 }
@@ -170,34 +81,89 @@ public class LoggerAgent extends Agent {
         dfd.addServices(sd);
         try {
             jade.domain.DFService.register(this, dfd);
-            System.out.println("[" + getLocalName() + "] Registered in DF as AUDIT");
-        } catch (jade.domain.FIPAException e) {
-            e.printStackTrace();
+        } catch (jade.domain.FIPAException e) { e.printStackTrace(); }
+    }
+
+    private void processMessage(ACLMessage msg) {
+        // Always log the raw message for the audit trail
+        logToAuditFile(msg);
+
+        Object content = null;
+        try {
+            content = msg.getContentObject();
+        } catch (Exception e) {
+            String text = msg.getContent();
+            if (text != null && !text.isEmpty()) {
+                // handle string-based logging if needed
+            }
+        }
+
+        if (content == null) return;
+
+        if (content instanceof Emergency e) {
+            String eId = e.getId();
+            incidentTypes.put(eId, e.getType());
+            if (detectedIncidents.add(eId)) {
+                emergencyStartTimes.put(eId, System.currentTimeMillis());
+                System.out.println("[LOGGER] EMERGENCY DETECTED: " + eId);
+            }
+        } else if (content instanceof Assignment a) {
+            if ("PRIMARY".equals(a.getRole())) {
+                assignedUnitsCount++;
+            }
+            System.out.println("[LOGGER] UNIT ASSIGNED: " + a.getUnitName() + " (" + a.getRole() + ") to " + a.getEmergencyId());
+        } else if (content instanceof MissionComplete mc) {
+            String eId = mc.getEmergencyId();
+            if (mc.isSuccess()) {
+                resolvedCount++;
+                if (resolvedIncidents.add(eId)) {
+                    System.out.println("[LOGGER] MISSION COMPLETE: " + eId);
+                    Long start = emergencyStartTimes.get(eId);
+                    if (start != null) {
+                        long responseTime = System.currentTimeMillis() - start;
+                        totalResponseTime += responseTime;
+                        recordResponseTime(eId, responseTime);
+                    }
+                }
+            }
+        } else if (content instanceof MissionAbort ma) {
+            missionAbortsCount++;
+            System.out.println("[LOGGER] MISSION ABORTED: " + ma.getEmergencyId() + " reason: " + ma.getReason());
+        } else if (content instanceof IncidentFailed f) {
+            failedIncidents.add(f.getEmergencyId());
+            System.out.println("[LOGGER] INCIDENT FAILED: " + f.getEmergencyId());
+        } else if (content instanceof MissionArrived ma) {
+            System.out.println("[LOGGER] UNIT ARRIVED: " + ma.getUnitName() + " at " + ma.getEmergencyId());
+        } else if (content instanceof PerimeterSecured ps) {
+            System.out.println("[LOGGER] PERIMETER SECURED: " + ps.getEmergencyId());
+        } else if (content instanceof UnitStatus) {
+            // Tracking unit status
         }
     }
 
-    private void logMessage(ACLMessage msg) {
+    private void logToAuditFile(ACLMessage msg) {
         String timestamp = LocalDateTime.now().format(formatter);
         String performative = ACLMessage.getPerformative(msg.getPerformative());
         String sender = msg.getSender().getLocalName();
-        String receiver = msg.getAllReceiver().hasNext() ?
-                msg.getAllReceiver().next().toString() : "broadcast";
         String ontology = msg.getOntology() != null ? msg.getOntology() : "none";
-
-        String content;
+        
+        String auditContent = "[no-content]";
         try {
-            content = msg.getContent() != null ? msg.getContent() : "[ontology object]";
-            if (content.length() > 80) {
-                content = content.substring(0, 77) + "...";
+            Object obj = msg.getContentObject();
+            if (obj != null) {
+                auditContent = serializeObjectToReadable(obj);
+            } else if (msg.getContent() != null) {
+                auditContent = msg.getContent();
             }
         } catch (Exception e) {
-            content = "[content error]";
+            auditContent = msg.getContent() != null ? msg.getContent() : "[error-reading-content]";
         }
 
-        String logEntry = String.format("[%s] %-18s | From: %-15s | To: %-20s | Ontology: %-20s | %s",
-                timestamp, performative, sender, receiver, ontology, content);
+        // Clean up any non-printable characters that might have leaked from binary content
+        auditContent = auditContent.replaceAll("[^\\p{Print}]", "?");
 
-        System.out.println("[LOG] " + logEntry);
+        String logEntry = String.format("{\"ts\":\"%s\",\"perf\":\"%s\",\"from\":\"%s\",\"ontology\":\"%s\",\"content\":\"%s\"}",
+                timestamp, performative, sender, ontology, auditContent);
 
         if (logWriter != null) {
             logWriter.println(logEntry);
@@ -205,132 +171,24 @@ public class LoggerAgent extends Agent {
         }
     }
 
-    private void trackNewIncident(ACLMessage msg) {
-        String sender = msg.getSender().getLocalName();
-        if (!sender.startsWith("sensor")) return;
-
-        String eId = msg.getConversationId();
-        if (eId == null || eId.isEmpty()) {
-            try {
-                com.umbb.sruu.ontology.HasEmergency he = (com.umbb.sruu.ontology.HasEmergency)
-                        getContentManager().extractContent(msg);
-                eId = he.getEmergency().getId();
-                incidentTypes.put(eId, he.getEmergency().getType());
-            } catch (Exception ex) {
-                eId = "EMERGENCY-" + System.currentTimeMillis();
-            }
+    private String serializeObjectToReadable(Object obj) {
+        if (obj == null) return "null";
+        if (obj instanceof Emergency e) {
+            return String.format("EMERGENCY(id=%s, type=%s, sev=%d)", e.getId(), e.getType(), e.getSeverity());
+        } else if (obj instanceof Assignment a) {
+            return String.format("ASSIGNMENT(id=%s, unit=%s, role=%s)", a.getEmergencyId(), a.getUnitName(), a.getRole());
+        } else if (obj instanceof UnitStatus s) {
+            return String.format("STATUS(unit=%s, state=%s, water=%d%%)", s.getUnitName(), s.getState(), s.getWater());
+        } else if (obj instanceof MissionComplete mc) {
+            return String.format("COMPLETE(id=%s, unit=%s, success=%b)", mc.getEmergencyId(), mc.getUnitName(), mc.isSuccess());
+        } else if (obj instanceof MissionAbort ma) {
+            return String.format("ABORT(id=%s, reason=%s)", ma.getEmergencyId(), ma.getReason());
+        } else if (obj instanceof PerimeterSecured ps) {
+            return String.format("PERIMETER_SECURED(id=%s, unit=%s)", ps.getEmergencyId(), ps.getUnitName());
+        } else if (obj instanceof RouteCleared rc) {
+            return String.format("ROUTE_CLEARED(from=%s, to=%s)", rc.getFrom(), rc.getTo());
         }
-
-        if (!detectedIncidents.contains(eId)) {
-            detectedIncidents.add(eId);
-            incidentCount++;
-            emergencyStartTimes.put(eId, System.currentTimeMillis());
-            System.out.println("[LOGGER] *** NEW INCIDENT DETECTED: " + eId + " (Total: " + incidentCount + ") ***");
-        }
-    }
-
-    private void trackAssignment(ACLMessage msg) {
-        String eId = msg.getConversationId();
-        if (eId == null || eId.isEmpty()) return;
-
-        if (!assignedIncidents.contains(eId)) {
-            assignedIncidents.add(eId);
-            assignedCount++;
-
-            if (emergencyStartTimes.containsKey(eId)) {
-                long responseTime = System.currentTimeMillis() - emergencyStartTimes.get(eId);
-                System.out.println("[LOGGER] *** INCIDENT ASSIGNED: " + eId + " to " + msg.getAllReceiver().next()
-                        + " (Response time: " + responseTime + "ms) ***");
-            }
-        }
-    }
-
-    private void trackRefusal(ACLMessage msg) {
-        refusedCount++;
-    }
-
-    private void trackAbortOrFailure(ACLMessage msg) {
-        String content = msg.getContent();
-        if (content != null && content.startsWith("UNIT_ABORT:")) {
-            String[] parts = content.split(":");
-            if (parts.length >= 4) {
-                String eId = parts[3];
-                if (!eId.equals("UNKNOWN") && !abortedIncidents.contains(eId)) {
-                    abortedIncidents.add(eId);
-                    abortedCount++;
-                    System.out.println("[LOGGER] *** INCIDENT ABORTED: " + eId + " by " + parts[1] + " ***");
-                }
-            }
-        } else if (content != null && content.startsWith("INCIDENT_FAILED:")) {
-            String[] parts = content.split(":", 3);
-            if (parts.length >= 2) {
-                String eId = parts[1];
-                if (!failedIncidents.contains(eId)) {
-                    failedIncidents.add(eId);
-                    failedCount++;
-                    System.out.println("[LOGGER] *** INCIDENT FAILED: " + eId + " ***");
-                }
-            }
-        }
-    }
-
-    private void trackLifecycle(ACLMessage msg) {
-        String content = msg.getContent();
-        if (content == null) return;
-
-        if (content.startsWith("DETECTED:")) {
-            String[] parts = content.split(":");
-            if (parts.length >= 2) {
-                String eId = parts[1];
-                if (parts.length >= 3) {
-                    incidentTypes.put(eId, parts[2]);
-                }
-                if (detectedIncidents.add(eId)) {
-                    incidentCount++;
-                    emergencyStartTimes.put(eId, System.currentTimeMillis());
-                    System.out.println("[LOGGER] DETECTED -> " + eId);
-                }
-            }
-        } else if (content.startsWith("ASSIGNED:")) {
-            String[] parts = content.split(":");
-            if (parts.length >= 3) {
-                String eId = parts[1];
-                if (assignedIncidents.add(eId)) {
-                    assignedCount++;
-                }
-                System.out.println("[LOGGER] ASSIGNED -> " + eId + " to " + parts[2]);
-            }
-        } else if (content.startsWith("MISSION_ARRIVED:")) {
-            String[] parts = content.split(":");
-            if (parts.length >= 3) {
-                String eId = parts[2];
-                if (!arrivalTimes.containsKey(eId)) {
-                    long now = System.currentTimeMillis();
-                    arrivalTimes.put(eId, now);
-                    Long detected = emergencyStartTimes.get(eId);
-                    if (detected != null) {
-                        long responseTime = now - detected;
-                        totalResponseTime += responseTime;
-                        recordResponseTime(eId, responseTime);
-                    }
-                }
-                System.out.println("[LOGGER] ARRIVED -> " + eId + " by " + parts[1]);
-            }
-        } else if (content.startsWith("RESOLVED:") || content.startsWith("MISSION_COMPLETE:")) {
-            String[] parts = content.split(":");
-            String eId = content.startsWith("RESOLVED:") && parts.length >= 2 ? parts[1]
-                    : (parts.length >= 3 ? parts[2] : null);
-            if (eId != null && resolvedIncidents.add(eId)) {
-                resolvedCount++;
-                System.out.println("[LOGGER] RESOLVED -> " + eId);
-            }
-        } else if (content.startsWith("ABORTED:")) {
-            String[] parts = content.split(":");
-            if (parts.length >= 2 && abortedIncidents.add(parts[1])) {
-                abortedCount++;
-                System.out.println("[LOGGER] ABORTED -> " + parts[1]);
-            }
-        }
+        return obj.toString();
     }
 
     private void recordResponseTime(String eId, long responseTime) {
@@ -338,74 +196,26 @@ public class LoggerAgent extends Agent {
         responseTimesByType.computeIfAbsent(type, key -> new ArrayList<>()).add(responseTime);
     }
 
-    private String buildResponseTimeGraph() {
-        if (responseTimesByType.isEmpty()) {
-            return "Response Time by Incident Type: no arrivals recorded\n";
-        }
-
-        long maxAverage = 1;
-        Map<String, Long> averages = new HashMap<>();
-        for (Map.Entry<String, List<Long>> entry : responseTimesByType.entrySet()) {
-            long avg = Math.round(entry.getValue().stream().mapToLong(Long::longValue).average().orElse(0));
-            averages.put(entry.getKey(), avg);
-            maxAverage = Math.max(maxAverage, avg);
-        }
-
-        final long maxAverageForGraph = maxAverage;
-        StringBuilder graph = new StringBuilder();
-        graph.append("Response Time by Incident Type (min/avg/max)\n");
-        responseTimesByType.entrySet().stream()
-                .sorted(Map.Entry.comparingByKey())
-                .forEach(entry -> {
-                    List<Long> values = entry.getValue();
-                    long min = values.stream().mapToLong(Long::longValue).min().orElse(0);
-                    long max = values.stream().mapToLong(Long::longValue).max().orElse(0);
-                    long avg = averages.get(entry.getKey());
-                    int barLength = Math.max(1, (int) Math.round((avg * 24.0) / maxAverageForGraph));
-                    graph.append(String.format("%-20s %7d/%7d/%7d ms | %s%n",
-                            entry.getKey(), min, avg, max, "#".repeat(barLength)));
-                });
-        return graph.toString();
-    }
-
     public void generateReport() {
         long elapsed = System.currentTimeMillis() - startTime;
+        int total = detectedIncidents.size();
+        int resolved = resolvedCount;
+        int aborted = missionAbortsCount;
+        int failed = failedIncidents.size();
+        int unresolved = total - resolved - failed;
+        
         int responseCount = responseTimesByType.values().stream().mapToInt(List::size).sum();
         double avgResponse = responseCount > 0 ? (double) totalResponseTime / responseCount : 0;
 
-        // Calculate unresolved: includes never-assigned and assigned-but-never-resolved incidents.
-        unresolvedCount = 0;
-        for (String eId : detectedIncidents) {
-            boolean wasResolved = resolvedIncidents.contains(eId);
-            boolean wasAborted = abortedIncidents.contains(eId);
-            boolean wasFailed = failedIncidents.contains(eId);
+        String reportJson = String.format("{\"type\":\"REPORT\",\"stats\":{\"durationSec\":%d,\"total\":%d,\"assigned\":%d,\"resolved\":%d,\"aborted\":%d,\"failed\":%d,\"unresolved\":%d,\"avgResponseMs\":%.2f}}",
+                elapsed / 1000, total, assignedUnitsCount, resolved, aborted, failed, unresolved, avgResponse);
 
-            if (!wasResolved && !wasAborted && !wasFailed) {
-                unresolvedCount++;
-            }
-        }
-
-        String report = "\n" +
-                "========================================\n" +
-                "SRUU FINAL REPORT\n" +
-                "========================================\n" +
-                "Session Duration: " + (elapsed / 1000) + " seconds\n" +
-                "Total Incidents:  " + incidentCount + "\n" +
-                "Units Assigned:   " + assignedCount + "\n" +
-                "Resolved:         " + resolvedCount + "\n" +
-                "Refused (busy):   " + refusedCount + "\n" +
-                "Aborted:          " + abortedCount + "\n" +
-                "Failed:           " + failedCount + "\n" +
-                "Unresolved:       " + unresolvedCount + "\n" +
-                "Avg Response Time: " + String.format("%.2f", avgResponse) + " ms\n" +
-                buildTable3Markdown() +
-                buildResponseTimeGraph() +
-                "========================================\n";
-
-        System.out.println(report);
+        System.out.println(reportJson);
 
         if (logWriter != null) {
-            logWriter.println(report);
+            logWriter.println("================ REPORT ================");
+            logWriter.println(reportJson);
+            logWriter.println(buildTable3Markdown());
             logWriter.flush();
         }
         exportTable3Csv();
@@ -443,7 +253,6 @@ public class LoggerAgent extends Agent {
                         writer.println(String.format("%s,%d,%d,%d,%d",
                                 entry.getKey(), values.size(), min, avg, max));
                     });
-            System.out.println("[LOGGER] Exported Table 3 metrics to " + csvPath.toAbsolutePath());
         } catch (IOException e) {
             System.err.println("[LOGGER] Failed to export Table 3 metrics: " + e.getMessage());
         }
@@ -454,9 +263,7 @@ public class LoggerAgent extends Agent {
         generateReport();
         try {
             jade.domain.DFService.deregister(this);
-        } catch (jade.domain.FIPAException e) {
-            e.printStackTrace();
-        }
+        } catch (jade.domain.FIPAException e) {}
         if (logWriter != null) {
             logWriter.close();
         }

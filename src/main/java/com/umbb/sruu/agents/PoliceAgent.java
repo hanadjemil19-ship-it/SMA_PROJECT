@@ -99,17 +99,20 @@ public class PoliceAgent extends Agent {
         addBehaviour(new CyclicBehaviour(this) {
             @Override
             public void action() {
-                MessageTemplate mt = new MessageTemplate(msg ->
-                        msg.getPerformative() == ACLMessage.INFORM
-                                && msg.getContent() != null
-                                && (msg.getContent().startsWith("PERIMETER_RELEASED:")
-                                || msg.getContent().startsWith("RELEASE_PERIMETER:")));
+                MessageTemplate mt = MessageTemplate.and(
+                        MessageTemplate.MatchPerformative(ACLMessage.INFORM),
+                        MessageTemplate.MatchOntology(EmergencyOntology.getInstance().getName())
+                );
                 ACLMessage msg = receive(mt);
                 if (msg != null) handlePerimeterReleased(msg);
                 else block();
             }
         });
     }
+    // setup(): Starts the agent at a random grid position, registers in the DF, and adds:
+    //   - A TickerBehaviour (every 5 s) that moves the idle officer to a random patrol point.
+    //   - CyclicBehaviours for CFP (propose/refuse), ACCEPT_PROPOSAL (mission start),
+    //     REJECT_PROPOSAL (continue patrol), and RELEASE_PERIMETER (return to idle).
 
     private void registerInDF() {
         DFAgentDescription dfd = new DFAgentDescription();
@@ -132,11 +135,14 @@ public class PoliceAgent extends Agent {
             e.printStackTrace();
         }
     }
+    // registerInDF(): Publishes this officer under two service types in the DF:
+    // "CROWD_CONTROL" (for the dispatcher's perimeter Contract-Net) and "PERIMETER"
+    // (secondary lookup).  Dual registration lets the dispatcher find police units for
+    // fire/collapse incidents that require crowd management.
 
     private void handleCFP(ACLMessage cfp) {
         try {
-            HasEmergency hasEmergency = (HasEmergency) getContentManager().extractContent(cfp);
-            Emergency emergency = hasEmergency.getEmergency();
+            Emergency emergency = (Emergency) cfp.getContentObject();
             String eId = cfp.getConversationId();
 
             if (state == State.IDLE && workload == 0) {
@@ -154,15 +160,14 @@ public class PoliceAgent extends Agent {
                 reply.setPerformative(ACLMessage.PROPOSE);
 
                 UnitStatus status = new UnitStatus();
-                status.setUnitId(getLocalName());
+                status.setUnitName(getLocalName());
                 status.setState(state.name());
-                status.setCurrentLocation(movement.getCurrentLocation());
+                status.setPosition(movement.getCurrentLocation());
                 status.setWorkload(workload);
 
-                UnitAvailable unitAvailable = new UnitAvailable();
-                unitAvailable.setStatus(status);
-
-                getContentManager().fillContent(reply, unitAvailable);
+                cfp.createReply();
+                reply.setContent("PROPOSE:" + getLocalName() + ":" + state.name());
+                reply.setContentObject(status);
                 System.out.println("[" + getLocalName() + "] Sending PROPOSE for " + emergency.getId());
 
             } else {
@@ -184,9 +189,27 @@ public class PoliceAgent extends Agent {
             e.printStackTrace();
         }
     }
+    // handleCFP(): Handles a Call-For-Proposal from the dispatcher.
+    // Police only propose for FIRE or STRUCTURAL_COLLAPSE incidents while IDLE with
+    // zero workload — these are the scenarios that require crowd control / perimeter
+    // management.  Any other situation (wrong type, busy, non-zero workload) results
+    // in a REFUSE with an explanatory reason string.
 
     private void handleAccept(ACLMessage accept) {
+        Object contentObj = null;
+        try {
+            contentObj = accept.getContentObject();
+        } catch (Exception e) {
+            String content = accept.getContent();
+            if (content != null && content.startsWith("ASSIGNMENT:")) {
+                // handle legacy string assignment
+            }
+        }
+
         String eId = accept.getConversationId();
+        if (contentObj instanceof Assignment assignment) {
+            eId = assignment.getEmergencyId();
+        }
         if (state != State.IDLE) {
             System.err.println("[" + getLocalName() + "] REJECTING ACCEPT - already busy (state=" + state + ")");
             ACLMessage reject = accept.createReply();
@@ -221,14 +244,25 @@ public class PoliceAgent extends Agent {
             sendLifecycleInform("PERIMETER_SECURED", currentMissionId);
         });
     }
+    // handleAccept(): Called when the dispatcher selects this officer as the CNP winner.
+    // Rejects if already busy (FAILURE reply). Otherwise retrieves the stored emergency,
+    // transitions to EN_ROUTE (suspending patrol), navigates to the scene, and on arrival
+    // transitions to ON_SITE and sends PERIMETER_SECURED to the dispatcher.
 
     private void handlePerimeterReleased(ACLMessage msg) {
-        String content = msg.getContent();
-        String[] parts = content != null ? content.split(":") : new String[0];
-        if (parts.length < 2) {
+        String incidentId = null;
+        try {
+            if (msg.getContentObject() instanceof ReleasePerimeter rp) {
+                incidentId = rp.getEmergencyId();
+            } else {
+                return;
+            }
+        } catch (Exception e) {
             return;
         }
-        String incidentId = parts[1];
+        if (incidentId == null) {
+            return;
+        }
         // Invariant: police must release perimeter even if EN_ROUTE (or before ON_SITE).
         boolean matchesAssigned = assignedEmergency != null && incidentId.equals(assignedEmergency.getId());
         boolean matchesCurrent = currentMissionId != null && incidentId.equals(currentMissionId);
@@ -251,11 +285,21 @@ public class PoliceAgent extends Agent {
             });
         }
     }
+    // handlePerimeterReleased(): Called when the dispatcher sends RELEASE_PERIMETER or
+    // PERIMETER_RELEASED (e.g. because the primary incident is resolved or aborted).
+    // Validates the incident ID against current/pending assignments, then transitions back
+    // to IDLE, notifies the dispatcher, and resumes random patrol movement.
 
     private void handleReject(ACLMessage reject) {
         String eId = reject.getConversationId();
         pendingEmergencies.remove(eId);
-        System.out.println("[" + getLocalName() + "] Proposal REJECTED for " + eId + ": " + reject.getContent());
+        String reason = reject.getContent();
+        try {
+            if (reject.getContentObject() instanceof Assignment a) {
+                reason = "assigned to " + a.getUnitName();
+            }
+        } catch (Exception e) {}
+        System.out.println("[" + getLocalName() + "] Proposal REJECTED for " + eId + ": " + reason);
 
         if (pendingEmergencies.isEmpty()) {
             System.out.println("[" + getLocalName() + "] Continuing patrol");
@@ -263,6 +307,9 @@ public class PoliceAgent extends Agent {
             System.out.println("[" + getLocalName() + "] Still have " + pendingEmergencies.size() + " pending proposal(s)");
         }
     }
+    // handleReject(): Removes the rejected emergency from pendingEmergencies.
+    // The officer simply resumes patrol — no state change needed since it was never
+    // assigned and remains IDLE throughout.
 
     private void transitionTo(State newState) {
         if (state != newState) {
@@ -273,6 +320,9 @@ public class PoliceAgent extends Agent {
             }
         }
     }
+    // transitionTo(): Changes the agent's internal state and clears any pending proposals.
+    // Also resets the idleNotified flag when transitioning away from IDLE so the next
+    // idle notification is sent exactly once after the mission ends.
 
     private void notifyDispatcherIdle() {
         if (idleNotified) {
@@ -284,25 +334,55 @@ public class PoliceAgent extends Agent {
         }
 
         ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
+        idle.setOntology(EmergencyOntology.getInstance().getName());
+        idle.setLanguage(new SLCodec().getName());
         idle.addReceiver(dispatcher);
-        idle.setContent("UNIT_IDLE:" + getLocalName());
-        send(idle);
-        idleNotified = true;
-        System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
+        try {
+            UnitStatus status = new UnitStatus();
+            status.setUnitName(getLocalName());
+            status.setState("IDLE");
+            idle.setContent("IDLE:" + getLocalName());
+            idle.setContentObject(status);
+            send(idle);
+            idleNotified = true;
+            System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
+    // notifyDispatcherIdle(): Sends "UNIT_IDLE:<name>" to the dispatcher exactly once
+    // (guarded by idleNotified) so it removes this officer from its busy list and can
+    // re-dispatch any queued incidents.  Falls back to a direct AID if the DF lookup fails.
 
     private void sendLifecycleInform(String event, String emergencyId) {
         if (emergencyId == null) return;
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+        msg.setOntology(EmergencyOntology.getInstance().getName());
+        msg.setLanguage(new SLCodec().getName());
         AID dispatcher = findAgentByService("COORDINATION");
         if (dispatcher != null) msg.addReceiver(dispatcher);
-        msg.setContent(event + ":" + getLocalName() + ":" + emergencyId);
-        send(msg);
+        try {
+            if ("PERIMETER_SECURED".equals(event)) {
+                PerimeterSecured ps = new PerimeterSecured();
+                ps.setEmergencyId(emergencyId);
+                ps.setUnitName(getLocalName());
+                msg.setContent("PERIMETER_SECURED:" + emergencyId + ":" + getLocalName());
+                msg.setContentObject(ps);
+            }
+            send(msg);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
+    // sendLifecycleInform(): Sends a plain-text lifecycle event (e.g. PERIMETER_SECURED)
+    // with the unit name and emergency ID to the dispatcher so it can record the event
+    // in the audit log and update the incident status.
 
     private AID findAgentByService(String serviceType) {
         return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
+    // findAgentByService(): DF lookup helper — returns the AID of the first agent offering
+    // the given service type, or null if no match is found at this moment.
 
     @Override
     protected void takeDown() {
@@ -313,6 +393,8 @@ public class PoliceAgent extends Agent {
         }
         System.out.println("[" + getLocalName() + "] PoliceAgent terminated");
     }
+    // takeDown(): Deregisters from the DF on shutdown so the dispatcher stops sending CFPs
+    // to this destroyed agent instance.
 
     // Visible for tests (package-private)
     void testSetMissionForRelease(String incidentId, State s) {
@@ -320,21 +402,32 @@ public class PoliceAgent extends Agent {
         this.workload = 1;
         this.currentMissionId = incidentId;
     }
+    // testSetMissionForRelease(): Test helper that directly injects a mission ID and state
+    // so unit tests can verify handlePerimeterReleased() without running a full CNP cycle.
 
     // Visible for tests (package-private)
     void testHandleReleaseMessage(String incidentId) {
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
-        msg.setContent("RELEASE_PERIMETER:" + incidentId);
+        try {
+            ReleasePerimeter rp = new ReleasePerimeter();
+            rp.setEmergencyId(incidentId);
+            msg.setContentObject(rp);
+        } catch (Exception e) {}
         handlePerimeterReleased(msg);
     }
+    // testHandleReleaseMessage(): Test helper that constructs a synthetic RELEASE_PERIMETER
+    // message and passes it directly to handlePerimeterReleased() for isolated testing.
 
     // Visible for tests (package-private)
     String testState() {
         return state.name();
     }
+    // testState(): Returns the current state name for use in unit test assertions.
 
     // Visible for tests (package-private)
     String testCurrentMissionId() {
         return currentMissionId;
     }
+    // testCurrentMissionId(): Returns the current mission ID for use in unit test assertions,
+    // allowing tests to verify that the mission is cleared after a release.
 }

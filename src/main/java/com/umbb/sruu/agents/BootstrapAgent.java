@@ -32,14 +32,6 @@ public class BootstrapAgent extends Agent {
         for (int i = 1; i <= 3; i++) {
             addLaunchStep(startupSequence, "firetruck-" + i, "com.umbb.sruu.agents.FireTruckAgent");
         }
-        // MODIFIED: add BCU agents (project requirement)
-        for (int i = 1; i <= 3; i++) { // NEW
-            addLaunchStep(startupSequence, "bcu-" + i, "com.umbb.sruu.agents.BiohazardContainmentUnitAgent"); // NEW
-        }
-
-        addLaunchStep(startupSequence, "hospital-1", "com.umbb.sruu.agents.HospitalAgent");
-        addLaunchStep(startupSequence, "hospital-2", "com.umbb.sruu.agents.HospitalAgent");
-        addLaunchStep(startupSequence, "hospital-3", "com.umbb.sruu.agents.HospitalAgent");
         addLaunchStep(startupSequence, "medical-coordinator", "com.umbb.sruu.agents.MedicalCoordinatorAgent");
         for (int i = 1; i <= 3; i++) {
             addLaunchStep(startupSequence, "ambulance-" + i, "com.umbb.sruu.agents.AmbulanceAgent");
@@ -52,13 +44,16 @@ public class BootstrapAgent extends Agent {
             protected void onWake() {
                 System.out.println("========================================");
                 System.out.println("  All agents launched!");
-                System.out.println("  3 Police + 3 Ambulances + 2 Sensors active");
+                System.out.println("  3 Police + 3 Ambulances + 3 FireTrucks + 2 Sensors active");
                 System.out.println("========================================");
             }
         });
 
         addBehaviour(startupSequence);
     }
+    // setup(): Initialises the agent and builds the ordered startup sequence.
+    // Each agent is launched one by one with a fixed delay (LAUNCH_DELAY ms) between
+    // them so every agent has time to complete its DF registration before the next one starts.
 
     /**
      * Adds a launch step: create agent + wait delay before next step
@@ -88,4 +83,8 @@ public class BootstrapAgent extends Agent {
             }
         });
     }
+    // addLaunchStep(): Appends two sub-behaviours to the startup sequence for a single agent:
+    // (1) a OneShotBehaviour that instantiates and starts the agent via the container controller,
+    // (2) a WakerBehaviour that pauses execution for LAUNCH_DELAY ms, giving the just-launched
+    //     agent time to register itself in the JADE Directory Facilitator (DF).
 }

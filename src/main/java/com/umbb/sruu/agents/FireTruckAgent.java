@@ -34,10 +34,10 @@ public class FireTruckAgent extends Agent {
     private final ReentrantLock stateLock = new ReentrantLock();
     private boolean idleNotified = false;
 
-    private int waterLevel = 100;
+    private int waterLevel = 40;
     private static final int WATER_PER_FIRE = 30;
     private static final int WATER_THRESHOLD = 25;
-    private static final int REFILL_TIME_MS = 8000;
+    private static final int REFILL_TIME_MS = 5000;
 
     @Override
     protected void setup() {
@@ -109,8 +109,7 @@ public class FireTruckAgent extends Agent {
 
     private void handleCFP(ACLMessage cfp) {
         try {
-            HasEmergency hasEmergency = (HasEmergency) getContentManager().extractContent(cfp);
-            Emergency emergency = hasEmergency.getEmergency();
+            Emergency emergency = (Emergency) cfp.getContentObject();
             String eId = cfp.getConversationId();
 
             stateLock.lock();
@@ -129,85 +128,57 @@ public class FireTruckAgent extends Agent {
 
             stateLock.lock();
             try {
-            if (waterLevel <= WATER_THRESHOLD) {
-                reply.setPerformative(ACLMessage.REFUSE);
-                reply.setContent("LOW_WATER");
-                System.out.println("[" + getLocalName() + "] Sending REFUSE - LOW WATER! (" + waterLevel + "%)");
-
-            } else if (state == State.IDLE && workload == 0) {
-                reply.setPerformative(ACLMessage.PROPOSE);
-
-                UnitStatus status = new UnitStatus();
-                status.setUnitId(getLocalName());
-                status.setState(state.name());
-                status.setCurrentLocation(movement.getCurrentLocation());
-                status.setWorkload(workload);
-
-                UnitAvailable unitAvailable = new UnitAvailable();
-                unitAvailable.setStatus(status);
-
-                getContentManager().fillContent(reply, unitAvailable);
-                System.out.println("[" + getLocalName() + "] Sending PROPOSE for " + emergency.getId());
-
-            } else {
-                reply.setPerformative(ACLMessage.REFUSE);
-                reply.setContent("Busy: state=" + state);
-                System.out.println("[" + getLocalName() + "] Sending REFUSE (busy)");
-            }
+                if (waterLevel <= WATER_THRESHOLD) {
+                    reply.setPerformative(ACLMessage.REFUSE);
+                    reply.setContent("LOW_WATER");
+                    System.out.println("[" + getLocalName() + "] Sending REFUSE - LOW WATER! (" + waterLevel + "%)");
+                } else if (state == State.IDLE && workload == 0) {
+                    reply.setPerformative(ACLMessage.PROPOSE);
+                    UnitStatus status = new UnitStatus();
+                    status.setUnitName(getLocalName());
+                    status.setState(state.name());
+                    status.setPosition(movement.getCurrentLocation());
+                    status.setWorkload(workload);
+                    status.setWater(waterLevel);
+                    reply.setContent("PROPOSE:" + getLocalName() + ":" + waterLevel);
+                    reply.setContentObject(status);
+                    System.out.println("[" + getLocalName() + "] Sending PROPOSE for " + emergency.getId());
+                } else {
+                    reply.setPerformative(ACLMessage.REFUSE);
+                    reply.setContent("Busy: state=" + state);
+                    System.out.println("[" + getLocalName() + "] Sending REFUSE (busy)");
+                }
             } finally {
                 stateLock.unlock();
             }
-
             send(reply);
-
         } catch (Exception e) {
-            System.err.println("[" + getLocalName() + "] Error: " + e.getMessage());
             e.printStackTrace();
         }
     }
 
-    private void sendAbortToDispatcher(String emergencyId, String reason) {
-        ACLMessage abort = new ACLMessage(ACLMessage.INFORM);
-        AID dispatcher = findAgentByService("COORDINATION");
-        if (dispatcher != null) abort.addReceiver(dispatcher);
-        String eId = (emergencyId != null && !emergencyId.isEmpty()) ? emergencyId : "UNKNOWN";
-        abort.setContent("UNIT_ABORT:" + getLocalName() + ":" + reason + ":" + eId);
-        send(abort);
-        System.out.println("[" + getLocalName() + "] Sent ABORT notification to dispatcher for " + eId);
-    }
-
-    // NEW: ABORT format required for dispatcher-only reassignment
-    private void sendAbortToDispatcherWaterEmpty(String emergencyId) {
-        ACLMessage abort = new ACLMessage(ACLMessage.INFORM);
-        AID dispatcher = findAgentByService("COORDINATION");
-        if (dispatcher != null) abort.addReceiver(dispatcher);
-        String eId = (emergencyId != null && !emergencyId.isEmpty()) ? emergencyId : "UNKNOWN";
-        abort.setContent("ABORT:" + getLocalName() + ":WATER_EMPTY:" + eId);
-        send(abort);
-        System.out.println("[" + getLocalName() + "] Sent ABORT (WATER_EMPTY) to dispatcher for " + eId);
-    }
-
     private void handleAccept(ACLMessage accept) {
         String eId = accept.getConversationId();
+        try {
+            if (accept.getContentObject() instanceof Assignment assignment) {
+                eId = assignment.getEmergencyId();
+            }
+        } catch (Exception e) {
+            System.err.println("[" + getLocalName() + "] Failed to read Assignment object: " + e.getMessage());
+        }
         stateLock.lock();
         try {
-        if (state != State.IDLE) {
-            System.err.println("[" + getLocalName() + "] REJECTING ACCEPT - already busy (state=" + state + ")");
-            ACLMessage reject = accept.createReply();
-            reject.setPerformative(ACLMessage.FAILURE);
-            reject.setContent("ALREADY_ASSIGNED");
-            send(reject);
+            if (state != State.IDLE) {
+                ACLMessage reject = accept.createReply();
+                reject.setPerformative(ACLMessage.FAILURE);
+                reject.setContent("ALREADY_ASSIGNED");
+                send(reject);
+                pendingEmergencies.clear();
+                return;
+            }
+            assignedEmergency = pendingEmergencies.get(eId);
             pendingEmergencies.clear();
-            return;
-        }
-
-        assignedEmergency = pendingEmergencies.get(eId);
-        pendingEmergencies.clear();
-
-        if (assignedEmergency == null) {
-            System.err.println("[" + getLocalName() + "] ERROR: No emergency stored for assignment! (eId=" + eId + ")");
-            return;
-        }
+            if (assignedEmergency == null) return;
         } finally {
             stateLock.unlock();
         }
@@ -218,59 +189,78 @@ public class FireTruckAgent extends Agent {
         workload = 1;
 
         final Location targetLocation = assignedEmergency.getLocation();
-        System.out.println("[" + getLocalName() + "] Target: " + targetLocation + " for " + assignedEmergency.getId());
-
         movement.setTarget(targetLocation, () -> {
             transitionTo(State.ACTIVE);
             sendLifecycleInform("MISSION_ARRIVED", currentMissionId);
-            System.out.println("[" + getLocalName() + "] ACTIVE - fighting fire/rescuing for " + assignedEmergency.getId());
+            System.out.println("[" + getLocalName() + "] ACTIVE - starting fire suppression ticks for " + assignedEmergency.getId());
 
-            stateLock.lock();
-            try {
-                waterLevel = Math.max(0, waterLevel - WATER_PER_FIRE); // MODIFIED: clamp to 0
-            } finally {
-                stateLock.unlock();
-            }
-            System.out.println("[" + getLocalName() + "] Water consumed. Remaining: " + waterLevel + "%");
-            boolean shouldAbortEmptyWater; // MODIFIED
-            stateLock.lock();
-            try {
-                // MODIFIED: ABORT only when water reaches 0 (project requirement)
-                shouldAbortEmptyWater = waterLevel <= 0 && currentMissionId != null && state == State.ACTIVE;
-            } finally {
-                stateLock.unlock();
-            }
-            if (shouldAbortEmptyWater) {
-                sendAbortToDispatcherWaterEmpty(currentMissionId); // NEW
-                transitionTo(State.RETURNING);
-                workload = 0;
-                movement.setTarget(new Location(20, 20), () -> {
-                    startRefill();
-                });
-                return;
-            }
-
-            addBehaviour(new WakerBehaviour(this, 4000) {
+            // Tick 1
+            addBehaviour(new WakerBehaviour(this, 2000) {
                 @Override
                 protected void onWake() {
-                    sendLifecycleInform("MISSION_COMPLETE", currentMissionId);
-                    System.out.println("[" + getLocalName() + "] Mission complete for " + assignedEmergency.getId() + ", returning to base");
-                    transitionTo(State.RETURNING);
-                    workload = 0;
+                    if (state != State.ACTIVE) return;
+                    stateLock.lock();
+                    try {
+                        waterLevel = Math.max(0, waterLevel - WATER_PER_FIRE);
+                    } finally {
+                        stateLock.unlock();
+                    }
+                    System.out.println("[" + getLocalName() + "] Tick 1 complete. Water: " + waterLevel + "%");
 
-                    movement.setTarget(new Location(20, 20), () -> {
-                        if (waterLevel < 100) {
-                            startRefill();
-                        } else {
-                            transitionTo(State.IDLE);
-                            assignedEmergency = null;
-                            currentMissionId = null;
-                            notifyDispatcherIdle();
-                            System.out.println("[" + getLocalName() + "] Back at base, water: " + waterLevel + "%, READY");
+                    // Tick 2
+                    addBehaviour(new WakerBehaviour(myAgent, 2000) {
+                        @Override
+                        protected void onWake() {
+                            if (state != State.ACTIVE) return;
+                            stateLock.lock();
+                            try {
+                                waterLevel = Math.max(0, waterLevel - WATER_PER_FIRE);
+                            } finally {
+                                stateLock.unlock();
+                            }
+                            System.out.println("[" + getLocalName() + "] Tick 2 complete. Water: " + waterLevel + "%");
+
+                            if (waterLevel <= 0) {
+                                abortDueToWater();
+                            } else {
+                                completeMission();
+                            }
                         }
                     });
                 }
             });
+        });
+    }
+
+    private void abortDueToWater() {
+        System.out.println("[" + getLocalName() + "] ABORTING mission - WATER DEPLETED!");
+        ACLMessage abortMsg = new ACLMessage(ACLMessage.INFORM);
+        abortMsg.setOntology(EmergencyOntology.getInstance().getName());
+        abortMsg.setLanguage(new SLCodec().getName());
+        AID dispatcher = findAgentByService("COORDINATION");
+        if (dispatcher != null) abortMsg.addReceiver(dispatcher);
+        try {
+            MissionAbort ma = new MissionAbort(currentMissionId, "WATER_DEPLETED");
+            abortMsg.setContent("ABORT:" + currentMissionId + ":WATER_DEPLETED");
+            abortMsg.setContentObject(ma);
+            send(abortMsg);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
+
+        transitionTo(State.RETURNING);
+        workload = 0;
+        movement.setTarget(new Location(20, 20), () -> startRefill());
+    }
+
+    private void completeMission() {
+        sendLifecycleInform("MISSION_COMPLETE", currentMissionId);
+        System.out.println("[" + getLocalName() + "] Mission complete for " + currentMissionId + ", returning to base");
+        transitionTo(State.RETURNING);
+        workload = 0;
+        movement.setTarget(new Location(20, 20), () -> {
+            if (waterLevel < 100) startRefill();
+            else finishMission();
         });
     }
 
@@ -280,47 +270,30 @@ public class FireTruckAgent extends Agent {
         addBehaviour(new WakerBehaviour(this, REFILL_TIME_MS) {
             @Override
             protected void onWake() {
-                completeRefillAndBecomeIdle();
+                stateLock.lock();
+                try {
+                    waterLevel = 100;
+                    finishMission();
+                } finally {
+                    stateLock.unlock();
+                }
             }
         });
     }
 
-    /**
-     * Invariant: regeneration completion is atomic:
-     * atomically { resource=100; state=IDLE; clear mission } then (exactly once) send IDLE.
-     */
-    private void completeRefillAndBecomeIdle() {
-        boolean shouldNotify;
-        stateLock.lock();
-        try {
-            waterLevel = 100;
-            state = State.IDLE;
-            pendingEmergencies.clear();
-            workload = 0;
-            assignedEmergency = null;
-            currentMissionId = null;
-            shouldNotify = !idleNotified;
-            idleNotified = true;
-        } finally {
-            stateLock.unlock();
-        }
-        if (shouldNotify) {
-            notifyDispatcherIdle();
-        }
-        System.out.println("[" + getLocalName() + "] Water REFILLED to 100%, IDLE and READY for next call");
+    private void finishMission() {
+        transitionTo(State.IDLE);
+        assignedEmergency = null;
+        currentMissionId = null;
+        notifyDispatcherIdle();
+        System.out.println("[" + getLocalName() + "] Back at base, Water: " + waterLevel + "%, IDLE and READY");
     }
 
     private void handleReject(ACLMessage reject) {
         String eId = reject.getConversationId();
         pendingEmergencies.remove(eId);
-        System.out.println("[" + getLocalName() + "] Proposal REJECTED for " + eId + ": " + reject.getContent());
-
-        if (pendingEmergencies.isEmpty()) {
-            System.out.println("[" + getLocalName() + "] Remaining IDLE, ready for next call");
-            transitionTo(State.IDLE);
+        if (pendingEmergencies.isEmpty() && state == State.IDLE) {
             workload = 0;
-        } else {
-            System.out.println("[" + getLocalName() + "] Still have " + pendingEmergencies.size() + " pending proposal(s)");
         }
     }
 
@@ -330,31 +303,82 @@ public class FireTruckAgent extends Agent {
             if (state != newState) {
                 pendingEmergencies.clear();
                 state = newState;
-                if (newState != State.IDLE) {
-                    idleNotified = false;
-                }
+                if (newState != State.IDLE) idleNotified = false;
             }
         } finally {
             stateLock.unlock();
         }
     }
 
+    // Test helpers for SystemicBugsTest
+    void testSetRefillingState(int water) {
+        stateLock.lock();
+        try {
+            this.state = State.REFILLING;
+            this.waterLevel = water;
+        } finally {
+            stateLock.unlock();
+        }
+    }
+
+    void testCompleteRefillAtomic() {
+        stateLock.lock();
+        try {
+            this.waterLevel = 100;
+            this.state = State.IDLE;
+        } finally {
+            stateLock.unlock();
+        }
+    }
+
+    String testState() {
+        return state.name();
+    }
+
+    int testWaterLevel() {
+        return waterLevel;
+    }
+
     private void notifyDispatcherIdle() {
         ACLMessage idle = new ACLMessage(ACLMessage.INFORM);
+        idle.setOntology(EmergencyOntology.getInstance().getName());
+        idle.setLanguage(new SLCodec().getName());
         AID dispatcher = findAgentByService("COORDINATION");
         if (dispatcher != null) idle.addReceiver(dispatcher);
-        idle.setContent("UNIT_IDLE:" + getLocalName());
-        send(idle);
-        System.out.println("[" + getLocalName() + "] Sent IDLE notification to dispatcher");
+        try {
+            UnitStatus status = new UnitStatus();
+            status.setUnitName(getLocalName());
+            status.setState("IDLE");
+            status.setWater(waterLevel);
+            idle.setContent("IDLE:" + getLocalName() + ":" + waterLevel);
+            idle.setContentObject(status);
+            send(idle);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private void sendLifecycleInform(String event, String emergencyId) {
         if (emergencyId == null) return;
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
+        msg.setOntology(EmergencyOntology.getInstance().getName());
+        msg.setLanguage(new SLCodec().getName());
         AID dispatcher = findAgentByService("COORDINATION");
         if (dispatcher != null) msg.addReceiver(dispatcher);
-        msg.setContent(event + ":" + getLocalName() + ":" + emergencyId);
-        send(msg);
+        try {
+            if ("MISSION_ARRIVED".equals(event)) {
+                MissionArrived arr = new MissionArrived(getLocalName(), emergencyId);
+                msg.setContent("MISSION_ARRIVED:" + getLocalName() + ":" + emergencyId);
+                msg.setContentObject(arr);
+            } else if ("MISSION_COMPLETE".equals(event)) {
+                MissionComplete mc = new MissionComplete(emergencyId, getLocalName(), true);
+                msg.setContent("MISSION_COMPLETE:" + emergencyId + ":" + getLocalName());
+                msg.setContentObject(mc);
+            }
+            send(msg);
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     }
 
     private AID findAgentByService(String serviceType) {
@@ -363,48 +387,6 @@ public class FireTruckAgent extends Agent {
 
     @Override
     protected void takeDown() {
-        try {
-            DFService.deregister(this);
-        } catch (FIPAException e) {
-            e.printStackTrace();
-        }
-        System.out.println("[" + getLocalName() + "] FireTruckAgent terminated");
-    }
-
-    // Visible for tests (package-private)
-    void testSetRefillingState(int water) {
-        stateLock.lock();
-        try {
-            state = State.REFILLING;
-            waterLevel = water;
-            idleNotified = false;
-        } finally {
-            stateLock.unlock();
-        }
-    }
-
-    // Visible for tests (package-private)
-    void testCompleteRefillAtomic() {
-        completeRefillAndBecomeIdle();
-    }
-
-    // Visible for tests (package-private)
-    String testState() {
-        stateLock.lock();
-        try {
-            return state.name();
-        } finally {
-            stateLock.unlock();
-        }
-    }
-
-    // Visible for tests (package-private)
-    int testWaterLevel() {
-        stateLock.lock();
-        try {
-            return waterLevel;
-        } finally {
-            stateLock.unlock();
-        }
+        try { DFService.deregister(this); } catch (FIPAException e) {}
     }
 }

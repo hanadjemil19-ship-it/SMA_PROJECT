@@ -16,15 +16,14 @@ public class UtilityCalculator {
      * Higher score = better candidate
      */
     public static double calculateUtility(UnitStatus unitStatus, Emergency emergency, String serviceType) {
-
-        // 1. Type match score. This must be based on the actual unit, not only the CFP service.
-        double typeMatchScore = getTypeMatchScore(unitStatus.getUnitId(), emergency.getType(), serviceType);
+        // 1. Type match score.
+        double typeMatchScore = getTypeMatchScore(unitStatus.getUnitName(), emergency.getType(), serviceType);
 
         // 2. Distance score (inverse - closer is better)
-        double distance = euclideanDistance(unitStatus.getCurrentLocation(), emergency.getLocation());
+        double distance = euclideanDistance(unitStatus.getPosition(), emergency.getLocation());
         double distanceScore = 1.0 / (1.0 + distance);  // Normalized 0-1
 
-        // 3. Workload score (inverse - less busy is better)
+        // 3. Workload score
         double workloadScore = 1.0 / (unitStatus.getWorkload() + 1.0);
         double severityScore = Math.max(1, Math.min(5, emergency.getSeverity())) / 5.0;
 
@@ -43,30 +42,27 @@ public class UtilityCalculator {
     }
 
     public static boolean isValidPrimaryResponder(UnitStatus unitStatus, Emergency emergency) {
-        String unitId = unitStatus.getUnitId() == null ? "" : unitStatus.getUnitId().toLowerCase();
+        String unitName = unitStatus.getUnitName() == null ? "" : unitStatus.getUnitName().toLowerCase();
         String emergencyType = emergency.getType();
 
-        if (emergencyType.equals("FIRE")) return unitId.contains("firetruck");
-        if (emergencyType.equals("STRUCTURAL_COLLAPSE")) return unitId.contains("firetruck");
-        if (emergencyType.equals("MEDICAL")) return unitId.contains("ambulance");
-        // FIX: BIOHAZARD/CRYOGENIC_LEAK must accept BCU as valid primary responder
-        if (emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) return unitId.contains("bcu"); // FIX
+        if (emergencyType.equals("FIRE")) return unitName.contains("firetruck");
+        if (emergencyType.equals("STRUCTURAL_COLLAPSE")) return unitName.contains("firetruck");
+        if (emergencyType.equals("MEDICAL")) return unitName.contains("ambulance");
 
         return false;
     }
 
-    private static double getTypeMatchScore(String unitId, String emergencyType, String serviceType) {
-        String normalizedUnitId = unitId == null ? "" : unitId.toLowerCase();
+    private static double getTypeMatchScore(String unitName, String emergencyType, String serviceType) {
+        String normalizedUnitName = unitName == null ? "" : unitName.toLowerCase();
 
-        // Primary capability = 1.0. These are the units allowed to resolve the incident.
-        if (emergencyType.equals("MEDICAL") && normalizedUnitId.contains("ambulance")) return 1.0;
-        if (emergencyType.equals("FIRE") && normalizedUnitId.contains("firetruck")) return 1.0;
-        if (emergencyType.equals("STRUCTURAL_COLLAPSE") && normalizedUnitId.contains("firetruck")) return 1.0;
-        // if ((emergencyType.equals("BIOHAZARD") || emergencyType.equals("CRYOGENIC_LEAK")) && normalizedUnitId.contains("bcu")) return 1.0;
+        // Primary capability = 1.0.
+        if (emergencyType.equals("MEDICAL") && normalizedUnitName.contains("ambulance")) return 1.0;
+        if (emergencyType.equals("FIRE") && normalizedUnitName.contains("firetruck")) return 1.0;
+        if (emergencyType.equals("STRUCTURAL_COLLAPSE") && normalizedUnitName.contains("firetruck")) return 1.0;
 
         // Secondary responders can be useful, but must not beat primary responders for assignment.
         if (serviceType.equals("CROWD_CONTROL")
-                && normalizedUnitId.contains("police")
+                && normalizedUnitName.contains("police")
                 && (emergencyType.equals("FIRE") || emergencyType.equals("STRUCTURAL_COLLAPSE"))) {
             return 0.5;
         }
@@ -92,7 +88,6 @@ public class UtilityCalculator {
         double s1Amb = score(0.0, 2, 0, 4);
         sb.append(String.format(" -> firetruck=%.4f, ambulance=%.4f (type-match dominates distance)\n", s1Firetruck, s1Amb));
 
-        // S2 removed (BIOHAZARD/BCU not in project specification)
         return sb.toString();
     }
 

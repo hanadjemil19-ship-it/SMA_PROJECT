@@ -2,7 +2,7 @@ package com.umbb.sruu.agents;
 
 import com.umbb.sruu.ontology.Emergency;
 import com.umbb.sruu.ontology.EmergencyOntology;
-import com.umbb.sruu.ontology.HasEmergency;
+
 import com.umbb.sruu.ontology.Location;
 import jade.content.lang.sl.SLCodec;
 import jade.core.AID;
@@ -49,7 +49,21 @@ public class SensorAgent extends Agent {
                 generateEmergency();
             }
         });
+
+        // Forced MEDICAL emergency after 10 seconds as requested
+        if (getLocalName().equals("sensor-1")) {
+            addBehaviour(new jade.core.behaviours.WakerBehaviour(this, 10000) {
+                @Override
+                protected void onWake() {
+                    generateForcedMedicalEmergency();
+                }
+            });
+        }
     }
+    // setup(): Initialises the sensor, sets its fixed grid position based on its name
+    // (sensor-1 = north, others = south), registers in the DF, then starts a periodic
+    // TickerBehaviour that fires generateEmergency() every 10 or 12 seconds to simulate
+    // spontaneous incident detection in the city grid.
 
     private void registerInDF() {
         DFAgentDescription dfd = new DFAgentDescription();
@@ -67,6 +81,9 @@ public class SensorAgent extends Agent {
             e.printStackTrace();
         }
     }
+    // registerInDF(): Publishes this sensor in the JADE Directory Facilitator (DF) under
+    // service type "sensor". This allows other agents (e.g., the dispatcher) to discover
+    // and monitor all active sensors in the system.
 
     private void generateEmergency() {
         incidentCounter++;
@@ -77,7 +94,7 @@ public class SensorAgent extends Agent {
         emergency.setId(globalId);
 
         // MODIFIED: extend incident types (keep existing behavior unchanged)
-        String[] types = {"FIRE", "MEDICAL", "STRUCTURAL_COLLAPSE", "BIOHAZARD", "CRYOGENIC_LEAK"}; // NEW
+        String[] types = {"FIRE", "MEDICAL", "STRUCTURAL_COLLAPSE"};
         emergency.setType(types[random.nextInt(types.length)]);
 
         emergency.setSeverity(random.nextInt(5) + 1);
@@ -97,18 +114,34 @@ public class SensorAgent extends Agent {
         sendEmergencyAlert(emergency);
     }
 
+    private void generateForcedMedicalEmergency() {
+        incidentCounter++;
+        String globalId = getLocalName().toUpperCase() + "-MEDICAL-FORCED-" + incidentCounter;
+        
+        Emergency emergency = new Emergency();
+        emergency.setId(globalId);
+        emergency.setType("MEDICAL");
+        emergency.setSeverity(3);
+        emergency.setLocation(new Location(15, 15));
+
+        System.out.println("[" + getLocalName() + "] FORCED MEDICAL DETECTION: " + emergency);
+        sendEmergencyAlert(emergency);
+    }
+    // generateEmergency(): Creates a new Emergency object with a unique ID, a randomly
+    // chosen type (FIRE, MEDICAL, STRUCTURAL_COLLAPSE), a random severity (1–5), and a
+    // location within ±10 cells of this sensor's fixed position (clamped to the 0–49 grid).
+    // After building the event it delegates to sendEmergencyAlert() to notify the dispatcher.
+
     private void sendEmergencyAlert(Emergency emergency) {
         ACLMessage msg = new ACLMessage(ACLMessage.INFORM);
         AID dispatcher = findAgentByService("COORDINATION");
         if (dispatcher != null) msg.addReceiver(dispatcher);
         msg.setLanguage(new SLCodec().getName());
         msg.setOntology(EmergencyOntology.getInstance().getName());
-
-        HasEmergency he = new HasEmergency();
-        he.setEmergency(emergency);
+        msg.setContent("DETECTED:" + emergency.getId() + ":" + emergency.getType());
 
         try {
-            getContentManager().fillContent(msg, he);
+            msg.setContentObject(emergency);
             send(msg);
             System.out.println("[" + getLocalName() + "] Sent INFORM to dispatcher");
         } catch (Exception e) {
@@ -116,10 +149,14 @@ public class SensorAgent extends Agent {
             e.printStackTrace();
         }
     }
+    // sendEmergencyAlert(): Sets the Emergency object directly via setContentObject(),
+    // bypassing FIPA SL predicate wrapping, and sends it to the DispatcherAgent.
 
     private AID findAgentByService(String serviceType) {
         return com.umbb.sruu.utils.AgentUtils.findAgentByService(this, serviceType);
     }
+    // findAgentByService(): Utility wrapper that queries the DF for the first agent offering
+    // the given service type and returns its AID, or null if none is found.
 
     @Override
     protected void takeDown() {
@@ -130,4 +167,6 @@ public class SensorAgent extends Agent {
         }
         System.out.println("[" + getLocalName() + "] SensorAgent terminated");
     }
+    // takeDown(): Cleanup hook called when the agent is killed or the platform shuts down.
+    // Deregisters this sensor from the DF so stale entries do not pollute future lookups.
 }

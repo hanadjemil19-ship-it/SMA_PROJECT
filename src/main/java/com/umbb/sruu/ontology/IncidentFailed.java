@@ -2,15 +2,15 @@ package com.umbb.sruu.ontology;
 
 import jade.content.Concept;
 
-public class PatientHandoff implements Concept {
+public class IncidentFailed implements Concept {
     private String emergencyId;
-    private String unitName;
+    private String reason;
 
-    public PatientHandoff() {}
+    public IncidentFailed() {}
 
     public String getEmergencyId() { return emergencyId; }
     public void setEmergencyId(String emergencyId) { this.emergencyId = emergencyId; }
 
-    public String getUnitName() { return unitName; }
-    public void setUnitName(String unitName) { this.unitName = unitName; }
+    public String getReason() { return reason; }
+    public void setReason(String reason) { this.reason = reason; }
 }

@@ -33,10 +33,11 @@ public class EmergencyOntology extends Ontology {
 
             // UnitStatus schema - DEPENDS on Location
             ConceptSchema statusSchema = new ConceptSchema("UnitStatus");
-            statusSchema.add("unitId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            statusSchema.add("unitName", (PrimitiveSchema) getSchema(BasicOntology.STRING));
             statusSchema.add("state", (PrimitiveSchema) getSchema(BasicOntology.STRING));
-            statusSchema.add("currentLocation", (ConceptSchema) getSchema("Location"));
-            statusSchema.add("workload", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            statusSchema.add("position", (ConceptSchema) getSchema("Location"));
+            statusSchema.add("workload", (PrimitiveSchema) getSchema(BasicOntology.FLOAT)); // Use float for java double in Jade
+            statusSchema.add("water", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
             add(statusSchema, UnitStatus.class);
 
             // Hospital schema - NO dependencies
@@ -46,6 +47,73 @@ public class EmergencyOntology extends Ontology {
             hospitalSchema.add("availableBeds", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
             hospitalSchema.add("totalBeds", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
             add(hospitalSchema, Hospital.class);
+
+            // Assignment schema
+            ConceptSchema assignmentSchema = new ConceptSchema("Assignment");
+            assignmentSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            assignmentSchema.add("unitName", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            assignmentSchema.add("role", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(assignmentSchema, Assignment.class);
+
+            // MissionComplete schema
+            ConceptSchema missionCompleteSchema = new ConceptSchema("MissionComplete");
+            missionCompleteSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            missionCompleteSchema.add("unitName", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            missionCompleteSchema.add("success", (PrimitiveSchema) getSchema(BasicOntology.BOOLEAN));
+            add(missionCompleteSchema, MissionComplete.class);
+
+            // Additional Concept schemas for messages
+            ConceptSchema routeExpiredSchema = new ConceptSchema("RouteExpired");
+            routeExpiredSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(routeExpiredSchema, RouteExpired.class);
+
+            ConceptSchema hospitalSaturationSchema = new ConceptSchema("HospitalSaturation");
+            hospitalSaturationSchema.add("hospitalName", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            hospitalSaturationSchema.add("availableBeds", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            hospitalSaturationSchema.add("totalBeds", (PrimitiveSchema) getSchema(BasicOntology.INTEGER));
+            hospitalSaturationSchema.add("percent", (PrimitiveSchema) getSchema(BasicOntology.FLOAT)); // double translates to float in basic ontology usually
+            add(hospitalSaturationSchema, HospitalSaturation.class);
+
+            ConceptSchema unitAbortSchema = new ConceptSchema("UnitAbort");
+            unitAbortSchema.add("unitName", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            unitAbortSchema.add("reason", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            unitAbortSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING), ObjectSchema.OPTIONAL);
+            add(unitAbortSchema, UnitAbort.class);
+
+            ConceptSchema incidentFailedSchema = new ConceptSchema("IncidentFailed");
+            incidentFailedSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            incidentFailedSchema.add("reason", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(incidentFailedSchema, IncidentFailed.class);
+
+            ConceptSchema perimeterSecuredSchema = new ConceptSchema("PerimeterSecured");
+            perimeterSecuredSchema.add("unitName", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            perimeterSecuredSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(perimeterSecuredSchema, PerimeterSecured.class);
+
+            ConceptSchema releasePerimeterSchema = new ConceptSchema("ReleasePerimeter");
+            releasePerimeterSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(releasePerimeterSchema, ReleasePerimeter.class);
+
+            ConceptSchema missionArrivedSchema = new ConceptSchema("MissionArrived");
+            missionArrivedSchema.add("unitName", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            missionArrivedSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(missionArrivedSchema, MissionArrived.class);
+
+            ConceptSchema patientHandoffSchema = new ConceptSchema("PatientHandoff");
+            patientHandoffSchema.add("unitName", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            patientHandoffSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(patientHandoffSchema, PatientHandoff.class);
+
+            ConceptSchema missionAbortSchema = new ConceptSchema("MissionAbort");
+            missionAbortSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            missionAbortSchema.add("reason", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(missionAbortSchema, MissionAbort.class);
+
+            ConceptSchema missionRejectSchema = new ConceptSchema("MissionReject");
+            missionRejectSchema.add("emergencyId", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            missionRejectSchema.add("reason", (PrimitiveSchema) getSchema(BasicOntology.STRING));
+            add(missionRejectSchema, MissionReject.class);
+
             // ========== THIRD: Register predicates ==========
 
             // HasEmergency - DEPENDS on Emergency
